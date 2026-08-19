@@ -4,37 +4,124 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Smart Bundle AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main>
-    <header>
-      <h1>Smart Bundle AI</h1>
-      <p class="muted">Prototipo — armá un combo dentro de tu presupuesto</p>
-      <p id="status" class="status">conectando…</p>
+  <div class="page">
+
+    <header class="site-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">🛒</span>
+        <span class="brand-name">Smart Bundle <em>AI</em></span>
+      </div>
+      <p id="status" class="status-pill status-pill--loading">conectando con la API…</p>
     </header>
 
-    <form id="bundle-form">
-      <label for="freeText">Contanos qué necesitás y cuánto tenés para gastar</label>
-      <textarea id="freeText" name="freeText" rows="2"
-        placeholder="Ej: necesito productos de limpieza, tengo $4000">necesito productos de limpieza, tengo $4000</textarea>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Prototipo · basado en la idea de Gaby</p>
+        <h1>Decile qué necesitás.<br>Te armamos el combo que más aprovecha tu plata.</h1>
+        <p class="hero-sub">
+          Elegí una categoría y cuánto tenés para gastar. El sistema arma la combinación que
+          más usa tu presupuesto sin pasarse ni un peso — y si algo no tiene stock, lo cambia
+          por un equivalente real.
+        </p>
+      </section>
 
-      <label for="preference">¿Buscás algo puntual? (opcional)</label>
-      <input id="preference" name="preference" type="text" placeholder="Ej: detergente">
+      <section class="builder" aria-labelledby="builder-heading">
+        <h2 id="builder-heading" class="visually-hidden">Armar combo</h2>
 
-      <button type="submit">Armar combo</button>
-    </form>
+        <form id="bundle-form">
+          <fieldset class="field-group">
+            <legend>1. ¿Qué categoría?</legend>
+            <div id="category-chips" class="chip-row" role="radiogroup" aria-label="Categoría">
+              <p class="chip-placeholder">cargando categorías…</p>
+            </div>
+          </fieldset>
 
-    <section id="result" class="result" hidden>
-      <p id="explanation"></p>
-      <ul id="items"></ul>
-      <div id="totals" class="totals"></div>
-      <div id="subs" class="subs"></div>
-      <p id="badge" class="badge"></p>
-    </section>
+          <fieldset class="field-group">
+            <legend>2. ¿Cuánto tenés para gastar?</legend>
+            <div class="budget-control">
+              <input type="range" id="budget-slider" min="500" max="15000" step="100" value="4000">
+              <div class="budget-value">
+                <span class="budget-currency">$</span>
+                <input type="number" id="budget-number" min="0" step="100" value="4000" aria-label="Presupuesto en pesos argentinos">
+                <span class="budget-currency-code">ARS</span>
+              </div>
+            </div>
+            <p class="field-hint">Precios y presupuesto en pesos argentinos.</p>
+          </fieldset>
 
-    <section id="error" class="error" hidden></section>
-  </main>
+          <fieldset class="field-group">
+            <legend>3. ¿Buscás algo puntual? <span class="optional">(opcional)</span></legend>
+            <input type="text" id="preference" placeholder="Ej: detergente, mouse, shampoo…">
+          </fieldset>
+
+          <details class="free-text-toggle">
+            <summary>O contanoslo con tus propias palabras →</summary>
+            <fieldset class="field-group field-group--nested">
+              <label for="freeText" class="free-text-label">
+                Esto reemplaza la categoría y el presupuesto de arriba. Lo interpreta la IA
+                (o las reglas, si no hay motor de IA disponible).
+              </label>
+              <textarea id="freeText" rows="2" placeholder="Ej: necesito productos de limpieza, tengo $4000, ojalá haya detergente"></textarea>
+            </fieldset>
+          </details>
+
+          <button type="submit" id="submit-btn">
+            <span class="btn-label">Armar combo</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+        </form>
+      </section>
+
+      <section id="result" class="receipt" hidden aria-live="polite">
+        <div class="receipt-head">
+          <span class="receipt-title">Tu combo</span>
+          <span id="engine-badge" class="engine-badge"></span>
+        </div>
+
+        <p id="explanation" class="explanation"></p>
+
+        <ul id="items" class="item-list"></ul>
+
+        <div id="subs" class="subs"></div>
+
+        <div class="budget-bar-wrap">
+          <div class="budget-bar-track">
+            <div id="budget-bar-fill" class="budget-bar-fill"></div>
+          </div>
+          <div class="budget-bar-labels">
+            <span id="total-label"></span>
+            <span id="leftover-label" class="leftover"></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="empty-result" class="receipt receipt--empty" hidden aria-live="polite">
+        <p id="empty-message"></p>
+      </section>
+
+      <section id="error" class="error-box" hidden role="alert"></section>
+
+      <section class="honesty-note">
+        <h3>Qué es real acá</h3>
+        <ul>
+          <li><strong>El cálculo del combo es real</strong>: programación dinámica exacta, no una IA adivinando.</li>
+          <li><strong>El catálogo es de prueba</strong>: 29 productos inventados, no una tienda real.</li>
+          <li><strong>La redacción puede ser IA real (Claude)</strong> o reglas fijas si no hay API key — el resultado nunca inventa productos o precios.</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Smart Bundle AI — prototipo educativo, Semillero Digital</p>
+    </footer>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
