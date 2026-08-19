@@ -1,5 +1,8 @@
 # Cómo seguir vos con esto
 
+Hay una versión más larga y con más contexto de esto en `docs/guia-deploy.html` — abrila
+en el navegador. Esto de acá es el resumen.
+
 Este repo arrancó como un prototipo que armamos para probar si tu idea de Smart Bundle AI
 se sostiene técnicamente. La respuesta es: sí, con dos ajustes (están explicados en el
 README y en el commit `fix(core): substitute must match product type...` — leélo, ahí está

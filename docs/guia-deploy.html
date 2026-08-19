@@ -1,0 +1,380 @@
+<title>Guía de deploy</title>
+<style>
+  :root {
+    --paper: #FBF6EC;
+    --surface: #FFFFFF;
+    --ink: #1E2A22;
+    --ink-soft: #55624F;
+    --ink-faint: #8B9483;
+    --rule: #E4DBC7;
+    --rule-soft: #EFE8D8;
+
+    --accent: #2F6B45;
+    --accent-strong: #1F4E31;
+    --accent-soft: #E4EEE1;
+
+    --coral: #D9622B;
+    --coral-soft: #FBE8DA;
+
+    --warn: #9A6A1B;
+    --warn-soft: #F5EBD4;
+
+    --f-display: "Sora", system-ui, sans-serif;
+    --f-body: "Work Sans", system-ui, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14180F;
+      --surface: #1C2317;
+      --ink: #EFE9D8;
+      --ink-soft: #B4B79E;
+      --ink-faint: #7C816C;
+      --rule: #34402A;
+      --rule-soft: #29331F;
+      --accent: #6FCB8F;
+      --accent-strong: #8FE0AB;
+      --accent-soft: #223528;
+      --coral: #F0996A;
+      --coral-soft: #3A2418;
+      --warn: #E0BC72;
+      --warn-soft: #362B14;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14180F;
+    --surface: #1C2317;
+    --ink: #EFE9D8;
+    --ink-soft: #B4B79E;
+    --ink-faint: #7C816C;
+    --rule: #34402A;
+    --rule-soft: #29331F;
+    --accent: #6FCB8F;
+    --accent-strong: #8FE0AB;
+    --accent-soft: #223528;
+    --coral: #F0996A;
+    --coral-soft: #3A2418;
+    --warn: #E0BC72;
+    --warn-soft: #362B14;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 16.5px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 20px 96px;
+  }
+
+  .wrap { max-width: 42rem; margin: 0 auto; }
+
+  header { padding: 48px 0 28px; border-bottom: 2px solid var(--ink); margin-bottom: 36px; }
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 12px;
+  }
+
+  h1 {
+    font-family: var(--f-display);
+    font-size: clamp(1.8rem, 5vw, 2.3rem);
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    font-weight: 700;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+
+  .standfirst { color: var(--ink-soft); font-size: 1.02rem; margin: 0; max-width: 38rem; }
+
+  section { margin-bottom: 44px; }
+
+  h2 {
+    font-family: var(--f-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 8px;
+  }
+
+  .section-note { color: var(--ink-soft); margin: 0 0 20px; font-size: 0.96rem; }
+
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 650; }
+  code {
+    font-family: var(--f-mono);
+    font-size: 0.87em;
+    background: var(--rule-soft);
+    color: var(--accent-strong);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  /* mental model */
+  .pieces {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 12px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 4px;
+  }
+  .piece { text-align: center; }
+  .piece-label {
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .piece-name { font-family: var(--f-display); font-weight: 700; font-size: 1.05rem; }
+  .piece-where { font-size: 0.82rem; color: var(--ink-soft); margin-top: 2px; }
+  .pieces-arrow { color: var(--ink-faint); font-size: 1.3rem; }
+
+  /* steps */
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+    display: flex;
+    gap: 16px;
+  }
+  .step-num {
+    font-family: var(--f-display);
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  .step-body h3 {
+    font-family: var(--f-display);
+    font-size: 1.02rem;
+    font-weight: 650;
+    margin: 3px 0 8px;
+  }
+  .step-body p { font-size: 0.95rem; }
+  .step-research {
+    font-family: var(--f-mono);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--rule);
+  }
+  .step-research b {
+    display: block;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-family: var(--f-body);
+  }
+
+  /* trap callout */
+  .trap {
+    background: var(--warn-soft);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--warn);
+    border-radius: 4px 10px 10px 4px;
+    padding: 18px 20px;
+  }
+  .trap .tag {
+    font-family: var(--f-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--warn);
+    font-weight: 700;
+    display: block;
+    margin-bottom: 8px;
+  }
+  .trap p { font-size: 0.95rem; }
+
+  /* debug discipline */
+  .discipline { list-style: none; padding: 0; margin: 0; }
+  .discipline li {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    font-size: 0.95rem;
+  }
+  .discipline li:last-child { border-bottom: none; }
+  .discipline-mark { color: var(--accent); font-weight: 700; flex: none; }
+
+  /* checklist */
+  .checklist {
+    background: var(--accent-soft);
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 20px 22px;
+  }
+  .checklist h2 { margin-bottom: 14px; }
+  .checklist ul { list-style: none; margin: 0; padding: 0; }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.94rem;
+    padding: 6px 0;
+  }
+  .check-box {
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--accent);
+    border-radius: 4px;
+    flex: none;
+    margin-top: 2px;
+  }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 20px; margin-top: 8px; }
+  footer p { font-size: 0.85rem; color: var(--ink-faint); margin: 0; }
+
+  @media (max-width: 520px) {
+    .pieces { grid-template-columns: 1fr; }
+    .pieces-arrow { transform: rotate(90deg); }
+    .step { flex-direction: column; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Smart Bundle AI · para vos</p>
+    <h1>La última posta: ponerlo en internet</h1>
+    <p class="standfirst">El motor ya está armado y probado. Lo que falta es que cualquiera lo pueda usar sin que tu computadora esté prendida — y esa parte te la dejamos a propósito.</p>
+  </header>
+
+  <section>
+    <h2>Por qué esta parte es tuya</h2>
+    <p>Todo lo que hay en <code>packages/core</code> —el cálculo del combo, la sustitución cuando algo no tiene stock— está construido, testeado y andando. Eso resolvía si la idea se sostenía técnicamente. Ya sabés que sí.</p>
+    <p>Deployarlo es otra cosa: es la parte donde un proyecto deja de ser "funciona en mi compu" y pasa a ser algo real. Es también, casi siempre, la parte donde más se aprende — y donde más trabas aparecen. Por eso te la dejamos entera.</p>
+  </section>
+
+  <section>
+    <h2>El modelo mental antes de tocar nada</h2>
+    <p class="section-note">Tenés dos piezas independientes, y hoy las dos viven en tu computadora.</p>
+    <div class="pieces">
+      <div class="piece">
+        <span class="piece-label">packages/web</span>
+        <div class="piece-name">El front</div>
+        <div class="piece-where">hoy: tu compu, puerto 5500</div>
+      </div>
+      <div class="pieces-arrow">→</div>
+      <div class="piece">
+        <span class="piece-label">packages/api</span>
+        <div class="piece-name">La API</div>
+        <div class="piece-where">hoy: tu compu, puerto 3001</div>
+      </div>
+    </div>
+    <p style="margin-top: 16px">Para que funcione para cualquiera, cada pieza tiene que vivir en un servidor real, y el front tiene que saber la dirección real de la API — no <code>localhost</code>, que solo existe dentro de tu propia máquina.</p>
+  </section>
+
+  <section>
+    <h2>El orden que conviene seguir</h2>
+    <p class="section-note">Cada paso depende del anterior — no te conviene saltear ni cambiar el orden.</p>
+
+    <div class="step">
+      <span class="step-num">1</span>
+      <div class="step-body">
+        <h3>Elegí dónde va a vivir la API</h3>
+        <p>Necesitás un servicio que corra <code>packages/api</code> de forma continua. Hay varios con plan gratuito para proyectos chicos — cada uno organiza distinto un repo con varias carpetas (esto se llama "monorepo"), así que fijate cómo le indicás cuál es la carpeta de arranque.</p>
+        <div class="step-research"><b>Para investigar</b>"deploy node express monorepo root directory" + el nombre del servicio que elijas.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-num">2</span>
+      <div class="step-body">
+        <h3>Deployala y anotá la URL real que te da</h3>
+        <p>Una vez arriba, vas a tener algo como <code>https://tu-proyecto.algo.app</code>. Probala directo con <code>/health</code> en la barra del navegador antes de seguir — si eso no responde, nada de lo que viene después va a andar.</p>
+        <p><strong>La <code>ANTHROPIC_API_KEY</code> es opcional.</strong> Sin ella, el sistema sigue funcionando con reglas fijas en vez de IA real. No hace falta que se la pidas a nadie para que esto funcione.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-num">3</span>
+      <div class="step-body">
+        <h3>Hacé que el front sepa esa URL sin tenerla escrita fija</h3>
+        <p>Buscá <code>ENDPOINT</code> en <code>packages/web/app.js</code>. Hoy apunta a <code>localhost:3001</code> a mano. Necesitás que ese valor cambie según dónde esté corriendo la página — local o ya deployada — sin que tengas que editar el código cada vez que redeployás.</p>
+        <div class="step-research"><b>Para investigar</b>"runtime config static site" — hay más de una forma correcta de resolver esto, la idea es que entiendas el problema, no que copies una solución.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-num">4</span>
+      <div class="step-body">
+        <h3>Deployá el front apuntando a la API real</h3>
+        <p><code>packages/web</code> son archivos estáticos — HTML, CSS, JS sin build. Es la parte más simple de las dos de deployar. El resultado te va a dar otra URL, esta sí para compartir.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-num">5</span>
+      <div class="step-body">
+        <h3>Probalo como lo probaría alguien que no sos vos</h3>
+        <p>Abrí la URL del front en el celular, o pedile a alguien que lo abra desde su casa. Armá un combo de verdad. Si algo falla acá y no te había fallado en local, es casi siempre el paso 3.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Una trampa real que ya nos comimos por vos</h2>
+    <div class="trap">
+      <span class="tag">Ya corregido en el repo</span>
+      <p><code>loadCatalog()</code> en <code>packages/api/src/app.ts</code> leía el catálogo con <code>fs.readFileSync</code> sobre una ruta armada en el momento. Andaba perfecto en local. En un servidor tipo serverless se hubiera roto en silencio, porque esas plataformas arman el paquete a deployar siguiendo los <code>import</code> del código — no rastrean qué archivos abre <code>fs</code> mientras corre.</p>
+      <p>Lo cambiamos por un <code>import</code> estático del JSON, que sí queda incluido siempre. No te lo cuento para que lo copies — ya está arreglado. Te lo cuento porque es un tipo de bug que vas a volver a pisar con otros archivos si no tenés el patrón general en la cabeza: <strong>lo que tu código lee en tiempo de ejecución no siempre viaja con el deploy; lo que importa arriba, sí.</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Cuando algo no funciona</h2>
+    <p class="section-note">El orden en que atacás un error importa tanto como el error en sí.</p>
+    <ul class="discipline">
+      <li><span class="discipline-mark">1</span><span>Leé el mensaje de error <strong>completo</strong>, no el resumen que le harías vos de memoria dos minutos después.</span></li>
+      <li><span class="discipline-mark">2</span><span>Buscalo tal cual está escrito, entre comillas. La mayoría de los errores de deploy ya los pisó alguien más.</span></li>
+      <li><span class="discipline-mark">3</span><span>Si después de un rato buscando seguís sin entender qué te está pidiendo la plataforma, ahí sí preguntá — con el error completo a mano, no "no me anda".</span></li>
+    </ul>
+  </section>
+
+  <section class="checklist">
+    <h2>Para ir tildando</h2>
+    <ul>
+      <li><span class="check-box"></span><span>API deployada, <code>/health</code> responde desde su URL real (no localhost)</span></li>
+      <li><span class="check-box"></span><span>Front lee la URL de la API de forma configurable, no hardcodeada</span></li>
+      <li><span class="check-box"></span><span>Front deployado, apuntando a la URL real de la API</span></li>
+      <li><span class="check-box"></span><span>Probado desde un dispositivo que no es tu compu de siempre</span></li>
+      <li><span class="check-box"></span><span>Armaste un combo de verdad y salió bien</span></li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>Smart Bundle AI — el resto del contexto está en el README y en PARA-GABY.md, en la raíz del repo.</p>
+  </footer>
+
+</div>
