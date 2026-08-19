@@ -1,15 +1,16 @@
 import express, { type Express } from 'express'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
 import { categoriesOf, composeBundle, type Product } from '@sba/core'
 import { buildAgents } from './adapters/claude.js'
+import catalogData from './data/catalog.json' with { type: 'json' }
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
+/**
+ * Import estático, no `fs.readFileSync`. Un `readFileSync` con una ruta
+ * armada en runtime no lo traza el bundler de Vercel (@vercel/nft solo seguí
+ * el grafo de imports) — el JSON quedaría afuera del deploy serverless y la
+ * API tiraría ENOENT en producción aunque local funcione perfecto.
+ */
 export function loadCatalog(): Product[] {
-  const raw = readFileSync(join(__dirname, '..', 'src', 'data', 'catalog.json'), 'utf-8')
-  return JSON.parse(raw) as Product[]
+  return catalogData as Product[]
 }
 
 /**
@@ -24,9 +25,8 @@ export function buildApp(catalog: Product[], apiKey: string | undefined): Expres
   const app = express()
   app.use(express.json())
 
-  // CORS abierto: es un prototipo local, la web (puerto 5500) y la API
-  // (puerto 3001) son orígenes distintos para el navegador aunque corran
-  // en la misma máquina.
+  // CORS abierto: es un prototipo, la web y la API son orígenes distintos
+  // tanto en local (5500 vs 3001) como deployadas (dos proyectos de Vercel).
   app.use((_req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
