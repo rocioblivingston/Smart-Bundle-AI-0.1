@@ -24,6 +24,17 @@ export function buildApp(catalog: Product[], apiKey: string | undefined): Expres
   const app = express()
   app.use(express.json())
 
+  // CORS abierto: es un prototipo local, la web (puerto 5500) y la API
+  // (puerto 3001) son orígenes distintos para el navegador aunque corran
+  // en la misma máquina.
+  app.use((_req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    next()
+  })
+  app.options('*', (_req, res) => res.sendStatus(204))
+
   app.get('/health', (_req, res) => {
     res.json({ ok: true, categories, aiEnabled: Boolean(apiKey) })
   })

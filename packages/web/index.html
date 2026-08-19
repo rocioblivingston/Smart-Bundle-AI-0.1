@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Bundle AI</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Smart Bundle AI</h1>
+      <p class="muted">Prototipo — armá un combo dentro de tu presupuesto</p>
+      <p id="status" class="status">conectando…</p>
+    </header>
+
+    <form id="bundle-form">
+      <label for="freeText">Contanos qué necesitás y cuánto tenés para gastar</label>
+      <textarea id="freeText" name="freeText" rows="2"
+        placeholder="Ej: necesito productos de limpieza, tengo $4000">necesito productos de limpieza, tengo $4000</textarea>
+
+      <label for="preference">¿Buscás algo puntual? (opcional)</label>
+      <input id="preference" name="preference" type="text" placeholder="Ej: detergente">
+
+      <button type="submit">Armar combo</button>
+    </form>
+
+    <section id="result" class="result" hidden>
+      <p id="explanation"></p>
+      <ul id="items"></ul>
+      <div id="totals" class="totals"></div>
+      <div id="subs" class="subs"></div>
+      <p id="badge" class="badge"></p>
+    </section>
+
+    <section id="error" class="error" hidden></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
