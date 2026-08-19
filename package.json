@@ -1,0 +1,14 @@
+{
+  "name": "smart-bundle-ai",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "npm run test --workspace=@sba/core",
+    "build:core": "npm run build --workspace=@sba/core",
+    "build:api": "npm run build:core && npm run build --workspace=@sba/api",
+    "dev:api": "npm run build:core && npm run dev --workspace=@sba/api",
+    "dev:web": "npx --yes serve packages/web -l 5500"
+  }
+}
