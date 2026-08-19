@@ -1,0 +1,203 @@
+<title>Flujo n8n</title>
+<style>
+  :root {
+    --paper: #FBF6EC;
+    --surface: #FFFFFF;
+    --ink: #1E2A22;
+    --ink-soft: #55624F;
+    --ink-faint: #8B9483;
+    --rule: #E4DBC7;
+    --rule-soft: #EFE8D8;
+
+    --accent: #2F6B45;
+    --accent-strong: #1F4E31;
+    --accent-soft: #E4EEE1;
+
+    --coral: #D9622B;
+    --coral-soft: #FBE8DA;
+
+    --f-display: "Sora", system-ui, sans-serif;
+    --f-body: "Work Sans", system-ui, sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14180F;
+      --surface: #1C2317;
+      --ink: #EFE9D8;
+      --ink-soft: #B4B79E;
+      --ink-faint: #7C816C;
+      --rule: #34402A;
+      --rule-soft: #29331F;
+      --accent: #6FCB8F;
+      --accent-strong: #8FE0AB;
+      --accent-soft: #223528;
+      --coral: #F0996A;
+      --coral-soft: #3A2418;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14180F;
+    --surface: #1C2317;
+    --ink: #EFE9D8;
+    --ink-soft: #B4B79E;
+    --ink-faint: #7C816C;
+    --rule: #34402A;
+    --rule-soft: #29331F;
+    --accent: #6FCB8F;
+    --accent-strong: #8FE0AB;
+    --accent-soft: #223528;
+    --coral: #F0996A;
+    --coral-soft: #3A2418;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    margin: 0;
+    padding: 40px 20px 64px;
+  }
+  .wrap { max-width: 800px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 12px;
+  }
+  h1 {
+    font-family: var(--f-display);
+    font-size: clamp(1.5rem, 4vw, 1.9rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 0.98rem; max-width: 40rem; margin: 0 0 32px; }
+
+  figure { margin: 0; }
+  .diagram-frame {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  svg { display: block; width: 100%; height: auto; color: var(--ink); }
+
+  figcaption {
+    margin-top: 16px;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+    line-height: 1.55;
+  }
+  figcaption strong { color: var(--ink); font-weight: 650; }
+
+  .verified {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 0.88rem;
+  }
+  .verified b { font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  code {
+    font-family: var(--f-mono);
+    font-size: 0.87em;
+    background: var(--rule-soft);
+    color: var(--accent-strong);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Smart Bundle AI · orquestación</p>
+  <h1>Cómo viaja un pedido, de la web al combo armado</h1>
+  <p class="standfirst">n8n orquesta la llamada; no calcula el combo. La lógica de negocio vive en la API, un servicio aparte — es la única forma real de conectarlos, porque el Code node de n8n no puede importar código de este repo.</p>
+
+  <figure>
+    <div class="diagram-frame">
+      <svg viewBox="0 0 760 460" role="img" aria-label="Diagrama de flujo: el comprador envía un pedido por POST al webhook de n8n; dentro de n8n, el nodo Webhook pasa los datos al nodo HTTP Request, que llama a la API Express fuera de n8n; la API corre la lógica de @sba/core y devuelve el combo armado; el nodo Respond to Webhook lo reenvía al comprador.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+          </marker>
+          <marker id="arrowAccent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"></path>
+          </marker>
+        </defs>
+
+        <!-- Comprador -->
+        <rect x="30" y="50" width="150" height="64" rx="10" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+        <text x="105" y="76" text-anchor="middle" font-family="var(--f-display)" font-weight="700" font-size="14" fill="currentColor">Comprador</text>
+        <text x="105" y="94" text-anchor="middle" font-family="var(--f-body)" font-size="11" fill="var(--ink-faint)">packages/web</text>
+
+        <!-- n8n boundary -->
+        <rect x="230" y="20" width="500" height="124" rx="12" fill="none" stroke="var(--ink-faint)" stroke-width="1.2" stroke-dasharray="5 5"></rect>
+        <text x="248" y="14" font-family="var(--f-mono)" font-size="11" letter-spacing="0.04em" fill="var(--ink-faint)">N8N — SOLO ORQUESTA</text>
+
+        <!-- Webhook node -->
+        <rect x="248" y="56" width="118" height="52" rx="8" fill="var(--rule-soft)" stroke="currentColor" stroke-width="1.2"></rect>
+        <text x="307" y="78" text-anchor="middle" font-family="var(--f-display)" font-weight="650" font-size="12.5" fill="currentColor">Webhook</text>
+        <text x="307" y="94" text-anchor="middle" font-family="var(--f-mono)" font-size="9.5" fill="var(--ink-faint)">recibe el POST</text>
+
+        <!-- HTTP Request node -->
+        <rect x="406" y="56" width="130" height="52" rx="8" fill="var(--rule-soft)" stroke="currentColor" stroke-width="1.2"></rect>
+        <text x="471" y="76" text-anchor="middle" font-family="var(--f-display)" font-weight="650" font-size="12.5" fill="currentColor">HTTP Request</text>
+        <text x="471" y="93" text-anchor="middle" font-family="var(--f-mono)" font-size="9.5" fill="var(--ink-faint)">llama a la API</text>
+
+        <!-- Respond to Webhook node -->
+        <rect x="576" y="56" width="134" height="52" rx="8" fill="var(--rule-soft)" stroke="currentColor" stroke-width="1.2"></rect>
+        <text x="643" y="76" text-anchor="middle" font-family="var(--f-display)" font-weight="650" font-size="11.5" fill="currentColor">Respond to</text>
+        <text x="643" y="90" text-anchor="middle" font-family="var(--f-display)" font-weight="650" font-size="11.5" fill="currentColor">Webhook</text>
+
+        <!-- arrows: comprador -> webhook -->
+        <line x1="180" y1="82" x2="244" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrow)"></line>
+        <text x="212" y="72" text-anchor="middle" font-family="var(--f-mono)" font-size="9" fill="var(--ink-soft)">POST /webhook/</text>
+        <text x="212" y="83" text-anchor="middle" font-family="var(--f-mono)" font-size="9" fill="var(--ink-soft)">smart-bundle</text>
+
+        <!-- webhook -> http request -->
+        <line x1="366" y1="82" x2="402" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrow)"></line>
+
+        <!-- http request -> respond -->
+        <line x1="536" y1="82" x2="572" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrow)"></line>
+
+        <!-- API box -->
+        <rect x="401" y="260" width="140" height="72" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"></rect>
+        <text x="471" y="288" text-anchor="middle" font-family="var(--f-display)" font-weight="700" font-size="13" fill="var(--accent-strong)">API (Express)</text>
+        <text x="471" y="304" text-anchor="middle" font-family="var(--f-mono)" font-size="9.5" fill="var(--accent-strong)">packages/api</text>
+        <text x="471" y="320" text-anchor="middle" font-family="var(--f-body)" font-size="9.5" fill="var(--accent-strong)">usa @sba/core</text>
+
+        <!-- http request -> API (down) -->
+        <line x1="453" y1="108" x2="453" y2="256" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowAccent)"></line>
+        <text x="443" y="185" text-anchor="end" font-family="var(--f-mono)" font-size="9.5" fill="var(--accent-strong)">POST /bundle</text>
+
+        <!-- API -> http request (up), response -->
+        <line x1="493" y1="256" x2="493" y2="108" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#arrowAccent)"></line>
+        <text x="503" y="185" text-anchor="start" font-family="var(--f-mono)" font-size="9.5" fill="var(--accent-strong)">combo (JSON)</text>
+
+        <!-- respond to webhook -> comprador, curved return -->
+        <path d="M 643 108 C 643 400, 105 400, 105 118" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="1 0" marker-end="url(#arrow)"></path>
+        <text x="374" y="415" text-anchor="middle" font-family="var(--f-mono)" font-size="10" fill="var(--ink-soft)">200 OK + combo armado, listo para el carrito</text>
+      </svg>
+    </div>
+    <figcaption>
+      El nodo <strong>Webhook</strong> solo recibe el pedido; el nodo <strong>HTTP Request</strong> es el único punto de contacto entre n8n y la lógica real — cruza hacia la API, que corre el algoritmo de <code>@sba/core</code> (el knapsack y la sustitución por falta de stock) y devuelve el resultado ya calculado. <strong>Respond to Webhook</strong> lo reenvía tal cual al comprador.
+    </figcaption>
+  </figure>
+
+  <div class="verified">
+    <span>✓</span>
+    <span><b>Verificado en vivo</b> — este flujo se probó con un <code>curl</code> real contra el webhook de producción, con la API corriendo en paralelo. Respuesta 200 con el combo correcto.</span>
+  </div>
+</div>
