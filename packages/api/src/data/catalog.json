@@ -1,0 +1,33 @@
+[
+  { "id": "det-ala", "name": "Detergente Ala 750ml", "category": "limpieza", "price": 1200, "inStock": false, "tags": ["detergente", "ala"] },
+  { "id": "det-skip", "name": "Detergente Skip 900ml", "category": "limpieza", "price": 1350, "inStock": true, "tags": ["detergente", "skip"] },
+  { "id": "esponja", "name": "Esponja Scotch Brite x3", "category": "limpieza", "price": 650, "inStock": true, "tags": ["esponja"] },
+  { "id": "lavandina", "name": "Lavandina Ayudín 1L", "category": "limpieza", "price": 800, "inStock": true, "tags": ["lavandina"] },
+  { "id": "trapo", "name": "Trapo de piso", "category": "limpieza", "price": 900, "inStock": true, "tags": ["trapo"] },
+  { "id": "jabon-polvo", "name": "Jabón en polvo Ala 800g", "category": "limpieza", "price": 2200, "inStock": true, "tags": ["jabon", "ala"] },
+  { "id": "cif", "name": "Limpiador Cif 500ml", "category": "limpieza", "price": 1450, "inStock": true, "tags": ["cif", "limpiador"] },
+  { "id": "papel-hig", "name": "Papel higiénico x4", "category": "limpieza", "price": 1800, "inStock": true, "tags": ["papel"] },
+  { "id": "rollo-cocina", "name": "Rollo de cocina x2", "category": "limpieza", "price": 1100, "inStock": true, "tags": ["rollo"] },
+  { "id": "guantes", "name": "Guantes de látex", "category": "limpieza", "price": 700, "inStock": true, "tags": ["guantes"] },
+
+  { "id": "mouse", "name": "Mouse inalámbrico Logitech", "category": "tecnologia", "price": 8500, "inStock": true, "tags": ["mouse"] },
+  { "id": "teclado", "name": "Teclado básico USB", "category": "tecnologia", "price": 6200, "inStock": true, "tags": ["teclado"] },
+  { "id": "pendrive", "name": "Pendrive 32GB", "category": "tecnologia", "price": 4800, "inStock": true, "tags": ["pendrive"] },
+  { "id": "auriculares", "name": "Auriculares con cable", "category": "tecnologia", "price": 5500, "inStock": true, "tags": ["auriculares"] },
+  { "id": "cargador", "name": "Cargador USB-C 20W", "category": "tecnologia", "price": 7200, "inStock": true, "tags": ["cargador"] },
+  { "id": "mousepad", "name": "Mousepad", "category": "tecnologia", "price": 2100, "inStock": true, "tags": ["mousepad"] },
+  { "id": "hdmi", "name": "Cable HDMI 1.5m", "category": "tecnologia", "price": 3400, "inStock": true, "tags": ["hdmi", "cable"] },
+  { "id": "hub-usb", "name": "Hub USB 4 puertos", "category": "tecnologia", "price": 5900, "inStock": false, "tags": ["hub"] },
+  { "id": "hub-usb-2", "name": "Hub USB 4 puertos (otra marca)", "category": "tecnologia", "price": 6400, "inStock": true, "tags": ["hub"] },
+  { "id": "base-notebook", "name": "Base para notebook", "category": "tecnologia", "price": 9800, "inStock": true, "tags": ["base", "notebook"] },
+
+  { "id": "shampoo", "name": "Shampoo 400ml", "category": "cuidado-personal", "price": 2800, "inStock": true, "tags": ["shampoo"] },
+  { "id": "jabon-tocador", "name": "Jabón de tocador x3", "category": "cuidado-personal", "price": 1500, "inStock": true, "tags": ["jabon"] },
+  { "id": "desodorante", "name": "Desodorante roll-on", "category": "cuidado-personal", "price": 2200, "inStock": true, "tags": ["desodorante"] },
+  { "id": "crema-manos", "name": "Crema de manos", "category": "cuidado-personal", "price": 1900, "inStock": true, "tags": ["crema"] },
+  { "id": "cepillo", "name": "Cepillo de dientes x2", "category": "cuidado-personal", "price": 1300, "inStock": true, "tags": ["cepillo"] },
+  { "id": "pasta-dental", "name": "Pasta dental 90g", "category": "cuidado-personal", "price": 1600, "inStock": true, "tags": ["pasta"] },
+  { "id": "protector-solar", "name": "Protector solar FPS50", "category": "cuidado-personal", "price": 4500, "inStock": true, "tags": ["protector", "solar"] },
+  { "id": "perfume", "name": "Perfume mini 30ml", "category": "cuidado-personal", "price": 6800, "inStock": false, "tags": ["perfume"] },
+  { "id": "perfume-2", "name": "Perfume mini 30ml (otra fragancia)", "category": "cuidado-personal", "price": 7100, "inStock": true, "tags": ["perfume"] }
+]
