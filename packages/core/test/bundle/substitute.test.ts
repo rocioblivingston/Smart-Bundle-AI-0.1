@@ -3,7 +3,7 @@ import { findSubstitute } from '../../src/bundle/substitute.js'
 import type { Product } from '../../src/types.js'
 
 const p = (id: string, category: string, price: number, inStock = true): Product => ({
-  id, name: id, category, price, inStock, tags: [],
+  id, name: id, category, price, inStock, tags: ['generic'],
 })
 
 describe('findSubstitute', () => {
@@ -43,5 +43,26 @@ describe('findSubstitute', () => {
     const catalog = [target, already, p('libre', 'limpieza', 1200)]
     const sub = findSubstitute(target, catalog, [already])
     expect(sub?.id).toBe('libre')
+  })
+})
+
+describe('findSubstitute — catálogo realista con varios tipos por categoría', () => {
+  const withTags = (id: string, price: number, tags: string[], inStock = true) =>
+    ({ id, name: id, category: 'limpieza', price, inStock, tags }) satisfies Product
+
+  it('no sugiere un producto de otro tipo aunque el precio sea el más cercano', () => {
+    const target = withTags('detergente-a', 1200, ['detergente'], false)
+    const catalog = [
+      target,
+      withTags('rollo-cocina', 1100, ['rollo']),      // más cerca en precio, tipo distinto
+      withTags('detergente-b', 1350, ['detergente']),  // mismo tipo, un poco más lejos en precio
+    ]
+    expect(findSubstitute(target, catalog)?.id).toBe('detergente-b')
+  })
+
+  it('devuelve null en vez de un sustituto sin sentido cuando no hay overlap de tags', () => {
+    const target = withTags('detergente-a', 1200, ['detergente'], false)
+    const catalog = [target, withTags('rollo-cocina', 1150, ['rollo'])]
+    expect(findSubstitute(target, catalog)).toBeNull()
   })
 })
