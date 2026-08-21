@@ -9,7 +9,7 @@ sin pasarse ni un peso, y si algo no tiene stock lo reemplaza por un producto eq
 ```
 packages/
 ├─ core/    lógica de negocio pura — sin Express, sin n8n, sin SDK de Claude
-├─ api/     servidor HTTP que expone POST /bundle, llamando a core
+├─ api/     servidor HTTP, adaptador Carrefour/VTEX y fallback local
 └─ web/     página estática (HTML/CSS/JS sin build) que llama a la API
 n8n/         workflow importable: Webhook → HTTP Request → Respond
 ```
@@ -55,13 +55,28 @@ Abrí `http://localhost:5500`.
 
 ## Variables de entorno
 
-Copiá `.env.example` a `.env` en la raíz, o exportá `ANTHROPIC_API_KEY` antes de levantar la API.
-Es opcional: sin ella, el sistema usa el parser y el redactor determinísticos (`StubIntentParser`
-y `StubExplainer`) y funciona exactamente igual, solo que sin lenguaje natural elaborado.
+El proveedor predeterminado es Carrefour/VTEX y no requiere credenciales:
+
+```bash
+ECOMMERCE_PROVIDER=vtex
+```
+
+La API consulta `https://www.carrefour.com.ar/api/catalog_system/pub/products/search/{search}`.
+La preferencia explícita se usa como búsqueda; sin preferencia se busca la categoría. Si VTEX
+devuelve un error o no responde, el sistema usa automáticamente `packages/api/src/data/catalog.json`.
+
+Para trabajar siempre con el catálogo histórico:
+
+```bash
+ECOMMERCE_PROVIDER=local
+```
+
+`ANTHROPIC_API_KEY` sigue siendo opcional. Sin ella, el sistema usa `StubIntentParser` y
+`StubExplainer`, conservando el cálculo determinístico.
 
 ## Probar la sustitución
 
-El catálogo de prueba (`packages/api/src/data/catalog.json`) tiene a propósito dos productos sin
+En modo `ECOMMERCE_PROVIDER=local`, el catálogo de prueba tiene a propósito dos productos sin
 stock con un reemplazo real disponible: "Detergente Ala 750ml" (reemplazado por "Detergente Skip
 900ml") y "Perfume mini 30ml" (reemplazado por otra fragancia). En la web, escribí "detergente" en
 el campo de producto puntual y vas a ver la sustitución explicada.
@@ -75,7 +90,7 @@ npm run test --workspace=@sba/api     # API, contra un servidor efímero en memo
 
 ## Qué NO hace este prototipo
 
-- El catálogo es un JSON de 29 productos de prueba, no Tiendanube ni ningún ecommerce real.
+- El catálogo principal de la demo se consulta desde Carrefour/VTEX; el JSON local es fallback.
 - No hay checkout ni carrito real — el resultado es una lista para copiar, no un link de compra.
 - No hay autenticación ni multi-tienda.
 

@@ -35,6 +35,7 @@ describe('GET /health', () => {
     expect(body.ok).toBe(true)
     expect(body.categories).toEqual(['limpieza', 'tecnologia'])
     expect(body.aiEnabled).toBe(false)
+    expect(body.catalogProvider).toBe('local')
   })
 })
 
@@ -52,6 +53,7 @@ describe('POST /bundle', () => {
     expect(typeof body.explanation).toBe('string')
     expect(body.explanation.length).toBeGreaterThan(0)
     expect(body.usedAI).toBe(false)
+    expect(body.catalog.source).toBe('local')
   })
 
   it('extrae categoría y presupuesto de freeText con el stub', async () => {

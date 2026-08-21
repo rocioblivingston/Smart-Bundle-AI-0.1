@@ -1,6 +1,7 @@
 import express, { type Express } from 'express'
-import { categoriesOf, composeBundle, type Product } from '@sba/core'
+import { composeBundle, type Product } from '@sba/core'
 import { buildAgents } from './adapters/claude.js'
+import { LocalCatalogAdapter, type CatalogAdapter } from './adapters/catalog.js'
 import catalogData from './data/catalog.json' with { type: 'json' }
 
 /**
@@ -18,9 +19,12 @@ export function loadCatalog(): Product[] {
  * lógica que un test unitario no puede cubrir (parsear JSON, responder HTTP);
  * todo lo demás ya vive testeado en @sba/core.
  */
-export function buildApp(catalog: Product[], apiKey: string | undefined): Express {
+export function buildApp(catalogOrAdapter: Product[] | CatalogAdapter, apiKey: string | undefined): Express {
+  const catalogAdapter = Array.isArray(catalogOrAdapter)
+    ? new LocalCatalogAdapter(catalogOrAdapter)
+    : catalogOrAdapter
   const agents = buildAgents(apiKey)
-  const categories = categoriesOf(catalog)
+  const categories = catalogAdapter.categories()
 
   const app = express()
   app.use(express.json())
@@ -36,7 +40,12 @@ export function buildApp(catalog: Product[], apiKey: string | undefined): Expres
   app.options('*', (_req, res) => res.sendStatus(204))
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, categories, aiEnabled: Boolean(apiKey) })
+    res.json({
+      ok: true,
+      categories,
+      aiEnabled: Boolean(apiKey),
+      catalogProvider: catalogAdapter.provider,
+    })
   })
 
   app.post('/bundle', async (req, res) => {
@@ -71,11 +80,24 @@ export function buildApp(catalog: Product[], apiKey: string | undefined): Expres
       return
     }
 
-    const bundle = composeBundle(catalog, category, maxBudget, preferences)
+    const catalog = await catalogAdapter.getCatalog({ category, preferences })
+    const bundle = composeBundle(catalog.products, category, maxBudget, preferences)
     const request = { category, maxBudget, preferences }
     const { text: explanation, usedAI: explainAI } = await agents.explain(bundle, request)
 
-    res.json({ request, bundle, explanation, usedAI: usedAI || explainAI })
+    res.json({
+      request,
+      bundle,
+      catalog: {
+        configuredProvider: catalog.provider,
+        source: catalog.source,
+        label: catalog.label,
+        searchTerm: catalog.searchTerm,
+        fallbackReason: catalog.fallbackReason,
+      },
+      explanation,
+      usedAI: usedAI || explainAI,
+    })
   })
 
   return app

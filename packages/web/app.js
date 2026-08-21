@@ -1,9 +1,10 @@
 // Apunta directo a la API por default: hace que la demo funcione siempre,
 // sin depender de que n8n esté corriendo y con el workflow activo.
-// Para probar el camino real (web -> n8n -> API), cambiá esta constante por
-// la URL del webhook de n8n/smart-bundle-workflow.json.
-const ENDPOINT = 'http://localhost:3001/bundle'
-const HEALTH_ENDPOINT = 'http://localhost:3001/health'
+// `?api=http://localhost:3101` permite apuntar una vista previa a otra API
+// sin guardar configuracion ni secretos en el frontend.
+const apiBase = new URLSearchParams(window.location.search).get('api') ?? 'http://localhost:3001'
+const ENDPOINT = `${apiBase.replace(/\/$/, '')}/bundle`
+const HEALTH_ENDPOINT = `${apiBase.replace(/\/$/, '')}/health`
 
 const CATEGORY_LABELS = {
   'limpieza': '🧽 Limpieza',
@@ -20,6 +21,12 @@ const submitBtn = document.getElementById('submit-btn')
 const resultEl = document.getElementById('result')
 const emptyResultEl = document.getElementById('empty-result')
 const errorEl = document.getElementById('error')
+
+const priceFormatter = new Intl.NumberFormat('es-AR', {
+  style: 'currency',
+  currency: 'ARS',
+  maximumFractionDigits: 2,
+})
 
 let selectedCategory = null
 
@@ -56,8 +63,9 @@ async function checkHealth() {
     const res = await fetch(HEALTH_ENDPOINT)
     const body = await res.json()
     renderChips(body.categories)
+    const catalogName = body.catalogProvider === 'vtex' ? 'Carrefour/VTEX' : 'local'
     setStatus(
-      `conectado · IA: ${body.aiEnabled ? 'Claude' : 'reglas (sin API key)'}`,
+      `conectado · catálogo: ${catalogName} · IA: ${body.aiEnabled ? 'Claude' : 'reglas'}`,
       'ok',
     )
   } catch {
@@ -101,17 +109,60 @@ function renderReceipt(data) {
   document.getElementById('explanation').textContent = data.explanation
   document.getElementById('engine-badge').textContent =
     `motor: ${data.usedAI ? 'Claude' : 'reglas / stub'}`
+  const catalogBadge = document.getElementById('catalog-badge')
+  const isVtex = data.catalog?.source === 'vtex'
+  catalogBadge.textContent = isVtex
+    ? 'datos: Carrefour / VTEX'
+    : data.catalog?.source === 'local-fallback'
+      ? 'datos: local (fallback VTEX)'
+      : 'datos: catálogo local'
+  catalogBadge.className = `catalog-badge ${isVtex ? 'catalog-badge--vtex' : 'catalog-badge--local'}`
 
   const itemsEl = document.getElementById('items')
   itemsEl.innerHTML = ''
   for (const item of data.bundle.items) {
     const li = document.createElement('li')
-    const name = document.createElement('span')
+
+    const product = document.createElement('div')
+    product.className = 'item-product'
+    if (item.imageUrl) {
+      const image = document.createElement('img')
+      image.className = 'item-image'
+      image.src = item.imageUrl
+      image.alt = ''
+      image.loading = 'lazy'
+      product.appendChild(image)
+    }
+
+    const description = document.createElement('div')
+    description.className = 'item-description'
+    const name = item.productUrl ? document.createElement('a') : document.createElement('span')
     name.textContent = item.name
+    name.className = 'item-name'
+    if (item.productUrl) {
+      name.href = item.productUrl
+      name.target = '_blank'
+      name.rel = 'noreferrer'
+    }
+    description.appendChild(name)
+    if (item.seller) {
+      const seller = document.createElement('small')
+      seller.textContent = `Vendido por ${item.seller}`
+      description.appendChild(seller)
+    }
+    product.appendChild(description)
+
     const price = document.createElement('span')
     price.className = 'item-price'
-    price.textContent = `$${item.price}`
-    li.append(name, price)
+    if (item.listPrice && item.listPrice > item.price) {
+      const previous = document.createElement('del')
+      previous.textContent = priceFormatter.format(item.listPrice)
+      price.appendChild(previous)
+    }
+    const current = document.createElement('span')
+    current.textContent = priceFormatter.format(item.price)
+    price.appendChild(current)
+    li.append(product, price)
     itemsEl.appendChild(li)
   }
 
@@ -133,8 +184,8 @@ function renderReceipt(data) {
   const budgetTotal = totalPrice + leftoverBudget
   const pctUsed = budgetTotal > 0 ? Math.round((totalPrice / budgetTotal) * 100) : 0
   document.getElementById('budget-bar-fill').style.width = `${pctUsed}%`
-  document.getElementById('total-label').textContent = `Total: $${totalPrice}`
-  document.getElementById('leftover-label').textContent = `margen libre: $${leftoverBudget}`
+  document.getElementById('total-label').textContent = `Total: ${priceFormatter.format(totalPrice)}`
+  document.getElementById('leftover-label').textContent = `margen libre: ${priceFormatter.format(leftoverBudget)}`
 }
 
 function renderError(message) {

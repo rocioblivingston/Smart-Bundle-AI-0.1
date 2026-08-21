@@ -2,9 +2,19 @@ export interface Product {
   id: string
   name: string
   category: string
-  price: number      // pesos ARS, entero
+  price: number      // precio efectivo en pesos ARS
   inStock: boolean
   tags: string[]
+  /** Datos opcionales de ecommerce. El núcleo no depende del proveedor. */
+  productId?: string
+  skuId?: string
+  listPrice?: number
+  promotionalPrice?: number
+  seller?: string
+  availableQuantity?: number
+  imageUrl?: string
+  productUrl?: string
+  source?: 'local' | 'vtex'
 }
 
 export interface BundleRequest {

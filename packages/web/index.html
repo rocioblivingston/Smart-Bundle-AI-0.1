@@ -81,7 +81,10 @@
       <section id="result" class="receipt" hidden aria-live="polite">
         <div class="receipt-head">
           <span class="receipt-title">Tu combo</span>
-          <span id="engine-badge" class="engine-badge"></span>
+          <div class="receipt-badges">
+            <span id="catalog-badge" class="catalog-badge"></span>
+            <span id="engine-badge" class="engine-badge"></span>
+          </div>
         </div>
 
         <p id="explanation" class="explanation"></p>
@@ -111,7 +114,7 @@
         <h3>Qué es real acá</h3>
         <ul>
           <li><strong>El cálculo del combo es real</strong>: programación dinámica exacta, no una IA adivinando.</li>
-          <li><strong>El catálogo es de prueba</strong>: 29 productos inventados, no una tienda real.</li>
+          <li><strong>El catálogo principal viene de Carrefour/VTEX</strong>: si el servicio no responde, la demo vuelve al catálogo local sin interrumpirse.</li>
           <li><strong>La redacción puede ser IA real (Claude)</strong> o reglas fijas si no hay API key — el resultado nunca inventa productos o precios.</li>
         </ul>
       </section>

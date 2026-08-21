@@ -311,6 +311,21 @@ input[type="text"]:focus, textarea:focus, #budget-slider:focus-visible {
   font-weight: 700;
   font-size: 1.1rem;
 }
+.receipt-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.catalog-badge {
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+}
+.catalog-badge--vtex { background: var(--accent-soft); color: var(--accent-strong); }
+.catalog-badge--local { background: var(--warn-soft); color: var(--warn); }
 .engine-badge {
   font-family: var(--f-mono);
   font-size: 0.68rem;
@@ -333,7 +348,29 @@ input[type="text"]:focus, textarea:focus, #budget-slider:focus-visible {
   font-size: 0.96rem;
 }
 .item-list li:last-child { border-bottom: none; }
-.item-price { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 500; }
+.item-product { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.item-image {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  object-fit: contain;
+  background: white;
+}
+.item-description { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.item-name { color: inherit; font-weight: 500; text-decoration-color: var(--rule-strong); }
+.item-description small { color: var(--ink-faint); font-size: 0.72rem; }
+.item-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  font-family: var(--f-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.item-price del { color: var(--ink-faint); font-size: 0.72rem; font-weight: 400; }
 
 .subs { margin-bottom: 16px; }
 .sub-note {

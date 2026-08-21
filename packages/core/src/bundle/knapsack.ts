@@ -24,7 +24,9 @@ export function buildBundle(catalog: Product[], maxBudget: number): Bundle {
   const table = Array.from({ length: items.length + 1 }, () => new Array<number>(maxBudget + 1).fill(0))
 
   for (let i = 1; i <= items.length; i++) {
-    const price = items[i - 1].price
+    // Un ecommerce puede devolver centavos. Redondear hacia arriba para la
+    // capacidad conserva la garantia de no superar el presupuesto.
+    const price = Math.ceil(items[i - 1].price)
     for (let b = 0; b <= maxBudget; b++) {
       const without = table[i - 1][b]
       const withItem = price <= b ? table[i - 1][b - price] + price : -1
@@ -32,22 +34,22 @@ export function buildBundle(catalog: Product[], maxBudget: number): Bundle {
     }
   }
 
-  const bestTotal = table[items.length][maxBudget]
-
   // Reconstrucción: recorre la tabla de atrás hacia adelante.
   const chosen: Product[] = []
   let b = maxBudget
   for (let i = items.length; i > 0; i--) {
     if (table[i][b] !== table[i - 1][b]) {
       chosen.push(items[i - 1])
-      b -= items[i - 1].price
+      b -= Math.ceil(items[i - 1].price)
     }
   }
+
+  const actualTotal = Math.round(chosen.reduce((sum, product) => sum + product.price, 0) * 100) / 100
 
   return {
     items: chosen.reverse(),
     substitutions: [],
-    totalPrice: bestTotal,
-    leftoverBudget: maxBudget - bestTotal,
+    totalPrice: actualTotal,
+    leftoverBudget: Math.round((maxBudget - actualTotal) * 100) / 100,
   }
 }
