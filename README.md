@@ -52,9 +52,9 @@ npm run dev:api    # API en :3001
 
 Abrí `http://localhost:3001`. El backend sirve también la landing, por lo que no necesita CORS.
 
-Si querés servir el frontend separado con `npm run dev:web`, indicá la API mediante el parámetro
-de desarrollo `?api=http://localhost:3001`. En producción ese parámetro no es necesario:
-`VITE_API_URL` se incorpora durante el build de Vercel.
+Si querés servir el frontend separado con `npm run dev:web`, la web detecta ese modo local y usa
+`http://localhost:3001` automáticamente. El parámetro `?api=http://localhost:3001` sigue disponible
+para pruebas puntuales. En producción `VITE_API_URL` se incorpora durante el build de Vercel.
 
 ## Variables de entorno
 
@@ -87,6 +87,9 @@ Nike, Puma y Vans alojadas en Google Sites. Normaliza únicamente nombre, marca,
 URL de origen y el enlace público “Hace tu pedido” cuando existe. No interpreta el ID interno como
 SKU y no inventa stock, talles, promociones ni señales de calidad. Si Google Sites rechaza o demora
 la consulta, el adaptador usa la última copia disponible en memoria o el fallback local existente.
+Las imágenes se sirven mediante `/catalog-image`, un proxy restringido a los recursos públicos de
+Lenaldi, porque Google rechaza el hotlink directo fuera de Sites. El endpoint reduce y cachea las
+imágenes; no acepta dominios arbitrarios.
 La demostración no implica una asociación comercial oficial con Lenaldi.
 
 `GEMINI_API_KEY` sigue siendo opcional. Sin ella, el sistema usa `StubIntentParser` y
@@ -114,8 +117,8 @@ El orden de publicación es backend primero y frontend después:
    `npm ci && npm run build:api` como Build Command y
    `npm start --workspace=@sba/api` como Start Command. Configurar `/health` como Health Check.
 2. Cargar en Render `ECOMMERCE_PROVIDER=lenaldi`, `GEMINI_API_KEY`,
-   `LENALDI_WHATSAPP_NUMBER=5491178236492`, `LENALDI_CACHE_TTL_SECONDS=900` y temporalmente
-   `FRONTEND_ORIGIN=http://localhost:5500`. Render define `PORT`; no hay que fijarlo manualmente.
+   `LENALDI_WHATSAPP_NUMBER=5491178236492` y `LENALDI_CACHE_TTL_SECONDS=900`. Dejar
+   `FRONTEND_ORIGIN` vacío hasta obtener la URL de Vercel. Render define `PORT`; no hay que fijarlo.
 3. Copiar la URL HTTPS generada por Render.
 4. En Vercel importar la raíz del repositorio, elegir preset **Other**, ejecutar
    `npm run build:web` y publicar `dist/web`. Crear `VITE_API_URL` con la URL copiada de Render.

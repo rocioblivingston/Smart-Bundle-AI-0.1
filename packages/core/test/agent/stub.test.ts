@@ -87,6 +87,20 @@ describe('StubIntentParser', () => {
     expect(intent.requiredProducts).toEqual(['zapatillas'])
     expect(intent.preferredTags).toEqual(expect.arrayContaining(['nike', 'claras', 'uso diario']))
   })
+
+  it('no confunde el talle con el presupuesto de una búsqueda de zapatillas', async () => {
+    const intent = await parser.parse(
+      'Busco unas Nike negras, talle 38, con presupuesto de $100.000',
+      [...categories, 'zapatillas'],
+    )
+    expect(intent.maxBudget).toBe(100000)
+    expect(intent.preferredTags).toEqual(expect.arrayContaining(['nike', 'negras']))
+  })
+
+  it('no inventa un presupuesto cuando el único número es el talle', async () => {
+    const intent = await parser.parse('Busco Nike negras talle 38', [...categories, 'zapatillas'])
+    expect(intent.maxBudget).toBeNull()
+  })
 })
 
 describe('StubExplainer', () => {

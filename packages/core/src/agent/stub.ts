@@ -13,6 +13,31 @@ const FOOTWEAR_COLORS = [
 const FOOTWEAR_STYLES = ['casual', 'urbano', 'urbana', 'deportivo', 'deportiva', 'running', 'retro', 'clasico', 'clasica', 'skate']
 const unique = (values: string[]): string[] => [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 
+function parseLocalizedAmount(value: string): number | null {
+  const compact = value.replace(/\s/g, '')
+  const normalized = compact.includes(',')
+    ? compact.replace(/\./g, '').replace(',', '.')
+    : compact.replace(/\./g, '')
+  const amount = Number(normalized)
+  return Number.isFinite(amount) && amount > 0 ? amount : null
+}
+
+function extractBudget(text: string): number | null {
+  const amount = String.raw`(\d[\d.\s]*(?:,\d{1,2})?)`
+  const patterns = [
+    new RegExp(String.raw`\$\s*${amount}`),
+    new RegExp(String.raw`\b(?:presupuesto(?:\s+(?:de|es))?|hasta|puedo\s+gastar|quiero\s+gastar|gastar)\D{0,20}${amount}\s*(?:pesos)?\b`),
+    new RegExp(String.raw`\b${amount}\s*pesos\b`),
+  ]
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    const parsed = match?.[1] ? parseLocalizedAmount(match[1]) : null
+    if (parsed != null) return parsed
+  }
+  return null
+}
+
 const cleanPhrase = (value: string): string => value
   .replace(/\b(con|para|y|pero|que|tengo|hasta|presupuesto).*$/i, '')
   .replace(/[.,;:!?]/g, ' ')
@@ -33,9 +58,10 @@ export class StubIntentParser implements IntentParser {
     const footwearCategory = availableCategories.find((candidate) => normalize(candidate) === 'zapatillas')
     const mentionsFootwear = /\b(zapatillas?|sneakers?|calzado|adidas|new balance|nike|puma|vans)\b/.test(text)
     const category = explicitCategory ?? (footwearCategory && mentionsFootwear ? footwearCategory : null)
-    const withoutThousands = text.replace(/(\d)\.(\d{3})/g, '$1$2')
-    const budgetMatch = withoutThousands.match(/\$?\s*(\d{2,7})\s*(pesos)?/)
-    const maxBudget = budgetMatch ? Number(budgetMatch[1]) : null
+    // Los números sin contexto pueden ser talles, cantidades o modelos. Solo
+    // tratamos como presupuesto importes marcados con $, "pesos" o una frase
+    // comercial explícita para no confundir, por ejemplo, "talle 38" con $38.
+    const maxBudget = extractBudget(text)
 
     const excludedTags = captures(text, [/(?:sin|evitar que tenga)\s+([a-z][a-z0-9 -]{1,30})/g])
     const avoidedProducts = captures(text, [

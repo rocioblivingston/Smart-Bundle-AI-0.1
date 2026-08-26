@@ -1,4 +1,10 @@
-import express, { type Express } from 'express'
+import express, {
+  type ErrorRequestHandler,
+  type Express,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from 'express'
 import { fileURLToPath } from 'node:url'
 import {
   composeBundle,
@@ -90,6 +96,36 @@ const catalogMetadata = (catalog: Awaited<ReturnType<CatalogAdapter['getCatalog'
 })
 
 const WEB_DIRECTORY = fileURLToPath(new URL('../../web', import.meta.url))
+const MAX_CATALOG_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_CACHED_CATALOG_IMAGES = 100
+
+interface CatalogImageRequest {
+  imageUrl: URL
+  pageUrl: URL
+}
+
+function catalogImageRequest(imageValue: unknown, pageValue: unknown): CatalogImageRequest | undefined {
+  if (typeof imageValue !== 'string' || typeof pageValue !== 'string') return undefined
+  try {
+    const imageUrl = new URL(imageValue)
+    const pageUrl = new URL(pageValue)
+    const allowedImage = imageUrl.protocol === 'https:' &&
+      imageUrl.hostname === 'lh3.googleusercontent.com' &&
+      imageUrl.pathname.startsWith('/sitesv/')
+    const allowedPage = pageUrl.protocol === 'https:' &&
+      pageUrl.hostname === 'sites.google.com' &&
+      /^\/view\/lenaldi(?:\/|$)/.test(pageUrl.pathname)
+    return allowedImage && allowedPage ? { imageUrl, pageUrl } : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const asyncRoute = (
+  handler: (req: Request, res: Response) => Promise<void>,
+): RequestHandler => (req, res, next) => {
+  void handler(req, res).catch(next)
+}
 
 function isLocalDevelopmentOrigin(origin: string): boolean {
   try {
@@ -119,6 +155,7 @@ export function buildApp(
   const agents = buildAgents(geminiApiKey)
   const categories = catalogAdapter.categories()
   const conversations = new InMemoryConversationStore()
+  const catalogImageCache = new Map<string, { body: Buffer, contentType: string }>()
   const allowedFrontendOrigins = configuredFrontendOrigins(frontendOrigin)
   const app = express()
 
@@ -143,6 +180,7 @@ export function buildApp(
 
   app.get('/health', (_req, res) => {
     res.json({
+      status: 'ok',
       ok: true,
       categories,
       aiEnabled: agents.geminiConfigured,
@@ -153,7 +191,7 @@ export function buildApp(
     })
   })
 
-  app.get('/products', async (req, res) => {
+  app.get('/products', asyncRoute(async (req, res) => {
     const requestedCategory = typeof req.query.category === 'string' ? req.query.category : ''
     const category = categories.includes(requestedCategory)
       ? requestedCategory
@@ -171,7 +209,58 @@ export function buildApp(
     const categoryProducts = catalog.products.filter((product) => product.category === category)
     const products = search ? matchByKeyword(categoryProducts, search) : categoryProducts
     res.json({ products: products.slice(0, 24), catalog: catalogMetadata(catalog) })
-  })
+  }))
+
+  app.get('/catalog-image', asyncRoute(async (req, res) => {
+    const request = catalogImageRequest(req.query.url, req.query.page)
+    if (!request) {
+      res.status(400).json({ error: 'Imagen de catálogo inválida' })
+      return
+    }
+    const cacheKey = request.imageUrl.toString()
+    const cached = catalogImageCache.get(cacheKey)
+    if (cached) {
+      res.setHeader('Content-Type', cached.contentType)
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800')
+      res.send(cached.body)
+      return
+    }
+
+    try {
+      const optimizedImageUrl = new URL(request.imageUrl)
+      optimizedImageUrl.pathname = optimizedImageUrl.pathname.replace(/=w\d+$/, '=w480')
+      const response = await fetch(optimizedImageUrl, {
+        headers: {
+          Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          Referer: request.pageUrl.toString(),
+          'User-Agent': 'Mozilla/5.0 (compatible; SmartBundleAI/1.0)',
+        },
+        signal: AbortSignal.timeout(10_000),
+      })
+      const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? ''
+      const advertisedLength = Number(response.headers.get('content-length') ?? 0)
+      if (!response.ok || !contentType.startsWith('image/') || advertisedLength > MAX_CATALOG_IMAGE_BYTES) {
+        res.status(502).json({ error: 'Imagen del catálogo no disponible' })
+        return
+      }
+      const body = Buffer.from(await response.arrayBuffer())
+      if (body.byteLength > MAX_CATALOG_IMAGE_BYTES) {
+        res.status(502).json({ error: 'Imagen del catálogo demasiado grande' })
+        return
+      }
+      if (catalogImageCache.size >= MAX_CACHED_CATALOG_IMAGES) {
+        const oldestKey = catalogImageCache.keys().next().value as string | undefined
+        if (oldestKey) catalogImageCache.delete(oldestKey)
+      }
+      catalogImageCache.set(cacheKey, { body, contentType })
+      res.setHeader('Content-Type', contentType)
+      res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800')
+      res.send(body)
+    } catch (error) {
+      console.warn('[Catálogo] Imagen de Lenaldi no disponible', error instanceof Error ? error.message : 'error desconocido')
+      res.status(502).json({ error: 'Imagen del catálogo no disponible' })
+    }
+  }))
 
   app.get('/conversations/:conversationId', (req, res) => {
     const session = conversations.get(req.params.conversationId)
@@ -206,7 +295,7 @@ export function buildApp(
     res.status(204).send()
   })
 
-  app.post('/bundle', async (req, res) => {
+  app.post('/bundle', asyncRoute(async (req, res) => {
     const body = req.body as Record<string, unknown>
     const requestedConversationId = typeof body.conversationId === 'string'
       ? body.conversationId.trim().slice(0, 100)
@@ -413,11 +502,26 @@ export function buildApp(
       fallbackUsed: providerTelemetry.fallbackUsed,
       intentSource: providerTelemetry.intentSource,
     })
-  })
+  }))
 
   // En producción la misma URL HTTPS sirve API y landing. Esto evita exponer
   // secretos en el navegador y permite embeber la página publicada en Google Sites.
   app.use(express.static(WEB_DIRECTORY))
+
+  const apiErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
+    if (res.headersSent) {
+      next(error)
+      return
+    }
+    const candidateStatus = (error as { status?: unknown }).status
+    const status = typeof candidateStatus === 'number' && candidateStatus >= 400 && candidateStatus < 500
+      ? candidateStatus
+      : 500
+    const message = status === 400 ? 'Solicitud JSON inválida' : 'Error interno de la API'
+    console.error(`[API] ${message}`, error instanceof Error ? error.message : 'error desconocido')
+    res.status(status).json({ error: message })
+  }
+  app.use(apiErrorHandler)
 
   return app
 }

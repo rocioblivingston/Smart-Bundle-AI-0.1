@@ -2,9 +2,53 @@ const queryApi = new URLSearchParams(window.location.search).get('api')
 const configuredApi = typeof window.__SBA_CONFIG__?.apiUrl === 'string'
   ? window.__SBA_CONFIG__.apiUrl.trim()
   : ''
-const apiBase = queryApi || configuredApi || window.location.origin
+const localBrowser = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+const standaloneLocalWeb = localBrowser && ['5173', '5500', '5701'].includes(window.location.port)
+const apiBase = queryApi || configuredApi || (standaloneLocalWeb ? 'http://localhost:3001' : window.location.origin)
 const API = apiBase.replace(/\/$/, '')
 const endpoints = { health: `${API}/health`, products: `${API}/products`, bundle: `${API}/bundle` }
+
+class ApiRequestError extends Error {
+  constructor(message, kind, status) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.kind = kind
+    this.status = status
+  }
+}
+
+async function requestJson(url, options) {
+  let response
+  try {
+    response = await fetch(url, options)
+  } catch (error) {
+    if (localBrowser) console.error('[Smart Bundle] Error de red', error)
+    throw new ApiRequestError(`No se pudo conectar con la API en ${API}`, 'network')
+  }
+
+  const raw = await response.text()
+  let data = null
+  if (raw) {
+    try {
+      data = JSON.parse(raw)
+    } catch (error) {
+      if (localBrowser) console.error('[Smart Bundle] Respuesta no JSON', error)
+      throw new ApiRequestError(`La API respondió HTTP ${response.status} con un formato inválido`, 'configuration', response.status)
+    }
+  }
+  if (!response.ok) {
+    throw new ApiRequestError(data?.error || `La API respondió HTTP ${response.status}`, 'http', response.status)
+  }
+  return data
+}
+
+function connectionHelp(error) {
+  const detail = error instanceof Error ? error.message : 'Error desconocido'
+  if (!(error instanceof ApiRequestError) || error.kind === 'http') return detail
+  return localBrowser
+    ? `${detail}. Verificá que el backend esté activo con npm run dev:api.`
+    : `${detail}. Verificá VITE_API_URL y que el backend de Render esté activo.`
+}
 
 const CATEGORY_LABELS = { limpieza: 'Limpieza', tecnologia: 'Tecnología', 'cuidado-personal': 'Cuidado personal', zapatillas: 'Zapatillas' }
 const STRATEGY_LABELS = { 'lowest-cost': 'Más económico', balanced: 'Equilibrado', 'quality-first': 'Priorizar calidad', 'maximize-budget': 'Aprovechar presupuesto' }
@@ -48,6 +92,28 @@ function renderSource(catalog) {
     : 'Decime qué necesitás y cuánto querés gastar. Voy a interpretar tu pedido y reoptimizar cada respuesta.'
 }
 
+function catalogImageUrl(product) {
+  if (!product?.imageUrl || !product?.productUrl) return product?.imageUrl
+  try {
+    const image = new URL(product.imageUrl)
+    const page = new URL(product.productUrl)
+    if (image.hostname !== 'lh3.googleusercontent.com' || !image.pathname.startsWith('/sitesv/')) return product.imageUrl
+    if (page.hostname !== 'sites.google.com' || !page.pathname.startsWith('/view/lenaldi/')) return product.imageUrl
+    const query = new URLSearchParams({ url: image.toString(), page: page.toString() })
+    return `${API}/catalog-image?${query}`
+  } catch {
+    return product.imageUrl
+  }
+}
+
+function productPlaceholder() {
+  const placeholder = document.createElement('span')
+  placeholder.className = 'product-placeholder'
+  placeholder.textContent = '📦'
+  placeholder.setAttribute('aria-hidden', 'true')
+  return placeholder
+}
+
 function renderLoading() {
   elements.grid.replaceChildren(...Array.from({ length: 8 }, () => {
     const card = document.createElement('div')
@@ -71,16 +137,13 @@ function productCard(product) {
   }
   if (product.imageUrl) {
     const image = document.createElement('img')
-    image.src = product.imageUrl
+    image.src = catalogImageUrl(product)
     image.alt = product.name
     image.loading = 'lazy'
+    image.addEventListener('error', () => image.replaceWith(productPlaceholder()), { once: true })
     media.appendChild(image)
   } else {
-    const placeholder = document.createElement('span')
-    placeholder.className = 'product-placeholder'
-    placeholder.textContent = '📦'
-    placeholder.setAttribute('aria-hidden', 'true')
-    media.appendChild(placeholder)
+    media.appendChild(productPlaceholder())
   }
   const body = document.createElement('div')
   body.className = 'product-body'
@@ -138,9 +201,7 @@ async function loadProducts(search = '') {
   try {
     const query = new URLSearchParams({ category: selectedCategory })
     if (search) query.set('search', search)
-    const response = await fetch(`${endpoints.products}?${query}`)
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error ?? 'No se pudo cargar el catálogo')
+    const data = await requestJson(`${endpoints.products}?${query}`)
     renderSource(data.catalog)
     elements.grid.replaceChildren(...data.products.map(productCard))
     elements.message.textContent = data.products.length
@@ -150,7 +211,7 @@ async function loadProducts(search = '') {
       : `No encontramos resultados${search ? ` para “${search}”` : ''}.`
   } catch (error) {
     elements.grid.replaceChildren()
-    elements.message.textContent = `No se pudo consultar el catálogo: ${error.message}`
+    elements.message.textContent = `No se pudo consultar el catálogo: ${connectionHelp(error)}`
     elements.badge.textContent = 'API no disponible'
     elements.badge.className = 'source-badge source-badge--local'
   }
@@ -178,9 +239,7 @@ function updateCategoryCopy(category) {
 async function initialize() {
   renderLoading()
   try {
-    const response = await fetch(endpoints.health)
-    const health = await response.json()
-    if (!response.ok) throw new Error('API no disponible')
+    const health = await requestJson(endpoints.health)
     selectedCategory = health.categories.includes('zapatillas') ? 'zapatillas' : health.categories.includes('limpieza') ? 'limpieza' : health.categories[0]
     elements.nav.replaceChildren(...health.categories.map((category) => {
       const button = document.createElement('button')
@@ -199,7 +258,7 @@ async function initialize() {
     await loadProducts()
   } catch (error) {
     elements.grid.replaceChildren()
-    elements.message.textContent = `No se pudo conectar con la API (${error.message}). Levantala con npm run dev:api.`
+    elements.message.textContent = connectionHelp(error)
     elements.badge.textContent = 'API no disponible'
   }
 }
@@ -350,7 +409,8 @@ function renderBundleItem(item) {
   const row = document.createElement('li')
   if (item.imageUrl) {
     const image = document.createElement('img')
-    image.className = 'bundle-item-image'; image.src = item.imageUrl; image.alt = ''; image.loading = 'lazy'
+    image.className = 'bundle-item-image'; image.src = catalogImageUrl(item); image.alt = ''; image.loading = 'lazy'
+    image.addEventListener('error', () => { image.hidden = true }, { once: true })
     row.appendChild(image)
   }
   const description = document.createElement('div')
@@ -479,13 +539,11 @@ async function sendBundle(payload, userLabel) {
   if (userLabel) appendChatMessage('user', userLabel)
   setBusy(true)
   try {
-    const response = await fetch(endpoints.bundle, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error ?? 'No se pudo crear la recomendación')
+    const data = await requestJson(endpoints.bundle, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     if (data.whatsappHandoff) renderWhatsAppHandoff(data)
     else renderBundle(data)
   } catch (error) {
-    appendChatMessage('assistant', `No pude completar la recomendación: ${error.message}`)
+    appendChatMessage('assistant', `No pude completar la recomendación: ${connectionHelp(error)}`)
   } finally {
     setBusy(false); scrollChat()
   }

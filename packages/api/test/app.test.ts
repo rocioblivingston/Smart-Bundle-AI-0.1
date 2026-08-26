@@ -35,6 +35,7 @@ describe('GET /health', () => {
   it('lista las categorías y dice que la IA está apagada', async () => {
     const res = await fetch(`${baseUrl}/health`)
     const body = await res.json()
+    expect(body.status).toBe('ok')
     expect(body.ok).toBe(true)
     expect(body.categories).toEqual(['limpieza', 'tecnologia', 'zapatillas'])
     expect(body.aiEnabled).toBe(false)
@@ -51,6 +52,18 @@ describe('GET /products', () => {
     expect(res.status).toBe(200)
     expect(body.products.map((product: { id: string }) => product.id)).toEqual(['det-a', 'det-b'])
     expect(body.catalog.source).toBe('local')
+  })
+})
+
+describe('GET /catalog-image', () => {
+  it('rechaza URLs que no pertenecen a las páginas públicas de Lenaldi', async () => {
+    const params = new URLSearchParams({
+      url: 'https://example.com/image.jpg',
+      page: 'https://sites.google.com/view/lenaldi/zapatillas-brasilera/nike',
+    })
+    const res = await fetch(`${baseUrl}/catalog-image?${params}`)
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({ error: 'Imagen de catálogo inválida' })
   })
 })
 
@@ -94,6 +107,16 @@ describe('landing servida por el backend', () => {
 })
 
 describe('POST /bundle', () => {
+  it('devuelve JSON controlado cuando el cuerpo no es JSON válido', async () => {
+    const res = await fetch(`${baseUrl}/bundle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{',
+    })
+    expect(res.status).toBe(400)
+    await expect(res.json()).resolves.toEqual({ error: 'Solicitud JSON inválida' })
+  })
+
   it('arma el combo con categoría y presupuesto explícitos', async () => {
     const res = await fetch(`${baseUrl}/bundle`, {
       method: 'POST',

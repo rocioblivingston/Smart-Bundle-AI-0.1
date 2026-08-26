@@ -313,16 +313,15 @@
       <div class="step-body">
         <h3>Deployala y anotá la URL real que te da</h3>
         <p>Una vez arriba, vas a tener algo como <code>https://tu-proyecto.algo.app</code>. Probala directo con <code>/health</code> en la barra del navegador antes de seguir — si eso no responde, nada de lo que viene después va a andar.</p>
-        <p><strong>La <code>GEMINI_API_KEY</code> es opcional.</strong> Sin ella, el sistema sigue funcionando con reglas fijas en vez de IA real. No hace falta que se la pidas a nadie para que esto funcione.</p>
+        <p><strong>La <code>GEMINI_API_KEY</code> tiene que cargarse en Render para demostrar Gemini real.</strong> Si falta o el proveedor falla, la aplicación sigue disponible mediante reglas fijas, pero el indicador mostrará que se usó el fallback.</p>
       </div>
     </div>
 
     <div class="step">
       <span class="step-num">3</span>
       <div class="step-body">
-        <h3>Hacé que el front sepa esa URL sin tenerla escrita fija</h3>
-        <p>Buscá <code>ENDPOINT</code> en <code>packages/web/app.js</code>. Hoy apunta a <code>localhost:3001</code> a mano. Necesitás que ese valor cambie según dónde esté corriendo la página — local o ya deployada — sin que tengas que editar el código cada vez que redeployás.</p>
-        <div class="step-research"><b>Para investigar</b>"runtime config static site" — hay más de una forma correcta de resolver esto, la idea es que entiendas el problema, no que copies una solución.</div>
+        <h3>Conectá el front con la URL pública de Render</h3>
+        <p>La conexión ya está preparada: en Vercel creá <code>VITE_API_URL</code> con la URL HTTPS de Render, sin barra final. El script <code>npm run build:web</code> genera el <code>config.js</code> de producción; en local conserva el fallback a <code>localhost:3001</code>.</p>
       </div>
     </div>
 
@@ -330,7 +329,7 @@
       <span class="step-num">4</span>
       <div class="step-body">
         <h3>Deployá el front apuntando a la API real</h3>
-        <p><code>packages/web</code> son archivos estáticos — HTML, CSS, JS sin build. Es la parte más simple de las dos de deployar. El resultado te va a dar otra URL, esta sí para compartir.</p>
+        <p>Importá la raíz del repositorio en Vercel, usá preset <strong>Other</strong>, build <code>npm run build:web</code> y output <code>dist/web</code>. El resultado te va a dar otra URL, esta sí para compartir y colocar en Lenaldi.</p>
       </div>
     </div>
 
