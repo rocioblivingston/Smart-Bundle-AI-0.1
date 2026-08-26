@@ -1,6 +1,9 @@
 const queryApi = new URLSearchParams(window.location.search).get('api')
+const configuredApi = typeof window.__SBA_CONFIG__?.apiUrl === 'string'
+  ? window.__SBA_CONFIG__.apiUrl.trim()
+  : ''
 const standaloneLocalWeb = ['localhost', '127.0.0.1'].includes(window.location.hostname) && ['5500', '5701'].includes(window.location.port)
-const apiBase = queryApi ?? (standaloneLocalWeb ? 'http://localhost:3001' : window.location.origin)
+const apiBase = queryApi || configuredApi || (standaloneLocalWeb ? 'http://localhost:3001' : window.location.origin)
 const API = apiBase.replace(/\/$/, '')
 const endpoints = { health: `${API}/health`, products: `${API}/products`, bundle: `${API}/bundle` }
 

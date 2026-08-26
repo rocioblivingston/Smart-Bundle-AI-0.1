@@ -18,7 +18,7 @@ let baseUrl: string
 
 beforeAll(() => {
   // sin GEMINI_API_KEY -> corre con el stub, determinístico y sin red.
-  const app = buildApp(catalog, undefined)
+  const app = buildApp(catalog, undefined, undefined, 'https://smart-bundle-ai.vercel.app')
   return new Promise<void>((resolve) => {
     server = app.listen(0, () => {
       const address = server.address()
@@ -51,6 +51,34 @@ describe('GET /products', () => {
     expect(res.status).toBe(200)
     expect(body.products.map((product: { id: string }) => product.id)).toEqual(['det-a', 'det-b'])
     expect(body.catalog.source).toBe('local')
+  })
+})
+
+describe('CORS', () => {
+  it('permite el frontend configurado y responde el preflight', async () => {
+    const res = await fetch(`${baseUrl}/health`, {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://smart-bundle-ai.vercel.app' },
+    })
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://smart-bundle-ai.vercel.app')
+    expect(res.headers.get('vary')).toContain('Origin')
+  })
+
+  it('mantiene habilitado localhost para desarrollo', async () => {
+    const res = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: 'http://localhost:5500' },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5500')
+  })
+
+  it('rechaza un origen web no configurado', async () => {
+    const res = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: 'https://example.invalid' },
+    })
+    expect(res.status).toBe(403)
+    await expect(res.json()).resolves.toEqual({ error: 'Origen no permitido' })
   })
 })
 

@@ -41,7 +41,7 @@ Necesitás Node 22+.
 
 ```bash
 npm install
-npm run build:api
+npm run build
 ```
 
 Después, dos terminales:
@@ -89,16 +89,39 @@ La demostración no implica una asociación comercial oficial con Lenaldi.
 `GEMINI_API_KEY` sigue siendo opcional. Sin ella, el sistema usa `StubIntentParser` y
 `StubExplainer`, conservando el cálculo determinístico.
 
-## Publicación HTTPS y Google Sites
+Cuando frontend y backend se publican por separado se usan estas variables adicionales:
 
-Después de `npm run build:api`, `npm start --workspace=@sba/api` sirve la API y la landing desde
-el mismo origen. En una plataforma Node con HTTPS solo hay que configurar `PORT`,
-`ECOMMERCE_PROVIDER=lenaldi`, `GEMINI_API_KEY`, `LENALDI_WHATSAPP_NUMBER` y, opcionalmente,
-`LENALDI_CACHE_TTL_SECONDS`. La clave de Gemini debe cargarse como secreto del proveedor de hosting.
+```bash
+# Backend: origen público exacto de Vercel (admite una lista separada por comas)
+FRONTEND_ORIGIN=https://smart-bundle-ai.vercel.app
 
-La URL raíz publicada puede incorporarse manualmente en Google Sites mediante **Insertar →
-Incorporar → URL**. La aplicación no envía credenciales al navegador y no establece encabezados
-que bloqueen su uso dentro de un iframe de Google Sites.
+# Frontend: URL pública del Web Service de Render, sin barra final
+VITE_API_URL=https://smart-bundle-ai-api.onrender.com
+```
+
+`VITE_API_URL` es pública y solo contiene la dirección de la API. `GEMINI_API_KEY` nunca forma
+parte del build del frontend. Los orígenes `http://localhost` y `http://127.0.0.1` permanecen
+habilitados para desarrollo.
+
+## Publicación: Render + Vercel + Google Sites
+
+El orden de publicación es backend primero y frontend después:
+
+1. En Render crear un **Web Service** desde la raíz del repositorio. Usar
+   `npm ci && npm run build:api` como Build Command y
+   `npm start --workspace=@sba/api` como Start Command. Configurar `/health` como Health Check.
+2. Cargar en Render `ECOMMERCE_PROVIDER=lenaldi`, `GEMINI_API_KEY`,
+   `LENALDI_WHATSAPP_NUMBER=5491178236492`, `LENALDI_CACHE_TTL_SECONDS=900` y temporalmente
+   `FRONTEND_ORIGIN=http://localhost:5500`. Render define `PORT`; no hay que fijarlo manualmente.
+3. Copiar la URL HTTPS generada por Render.
+4. En Vercel importar la raíz del repositorio, elegir preset **Other**, ejecutar
+   `npm run build:web` y publicar `dist/web`. Crear `VITE_API_URL` con la URL copiada de Render.
+5. Copiar la URL de producción de Vercel, reemplazar `FRONTEND_ORIGIN` en Render por esa URL exacta
+   y reiniciar el servicio. Probar `/health`, una recomendación y el traspaso a WhatsApp.
+
+La URL de Vercel es la que debe vincularse desde el botón de Google Sites. También se puede probar
+**Insertar → Incorporar → URL**; el botón enlazado sigue siendo la alternativa más compatible con
+Google Sites.
 
 ## Probar la sustitución
 

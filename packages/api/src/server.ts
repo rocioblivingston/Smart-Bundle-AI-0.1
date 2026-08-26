@@ -4,6 +4,7 @@ import { LenaldiCatalogAdapter } from './adapters/lenaldi.js'
 import { VtexCatalogAdapter } from './adapters/vtex.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
+const HOST = process.env.HOST ?? '0.0.0.0'
 const provider = (process.env.ECOMMERCE_PROVIDER ?? 'vtex').trim().toLowerCase()
 const localCatalog = new LocalCatalogAdapter(loadCatalog())
 
@@ -19,10 +20,15 @@ const catalogAdapter = provider === 'vtex'
       cacheTtlSeconds: Number.isFinite(cacheTtlSeconds) ? cacheTtlSeconds : 900,
     })
     : localCatalog
-const app = buildApp(catalogAdapter, process.env.GEMINI_API_KEY, process.env.LENALDI_WHATSAPP_NUMBER)
+const app = buildApp(
+  catalogAdapter,
+  process.env.GEMINI_API_KEY,
+  process.env.LENALDI_WHATSAPP_NUMBER,
+  process.env.FRONTEND_ORIGIN,
+)
 
-app.listen(PORT, () => {
-  console.log(`SmartBundle API escuchando en http://localhost:${PORT}`)
+app.listen(PORT, HOST, () => {
+  console.log(`SmartBundle API escuchando en ${HOST}:${PORT}`)
   console.log(`ECOMMERCE_PROVIDER: ${catalogAdapter.provider}`)
   console.log(`Gemini: ${process.env.GEMINI_API_KEY ? 'configurado' : 'no configurado (fallback por reglas)'}`)
   console.log(`WhatsApp Lenaldi: ${process.env.LENALDI_WHATSAPP_NUMBER ? 'configurado' : 'no configurado'}`)

@@ -91,10 +91,27 @@ const catalogMetadata = (catalog: Awaited<ReturnType<CatalogAdapter['getCatalog'
 
 const WEB_DIRECTORY = fileURLToPath(new URL('../../web', import.meta.url))
 
+function isLocalDevelopmentOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin)
+    return url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+  } catch {
+    return false
+  }
+}
+
+function configuredFrontendOrigins(value: string | undefined): Set<string> {
+  return new Set((value ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean))
+}
+
 export function buildApp(
   catalogOrAdapter: Product[] | CatalogAdapter,
   geminiApiKey: string | undefined,
   lenaldiWhatsAppNumber?: string,
+  frontendOrigin?: string,
 ): Express {
   const catalogAdapter = Array.isArray(catalogOrAdapter)
     ? new LocalCatalogAdapter(catalogOrAdapter)
@@ -102,13 +119,24 @@ export function buildApp(
   const agents = buildAgents(geminiApiKey)
   const categories = catalogAdapter.categories()
   const conversations = new InMemoryConversationStore()
+  const allowedFrontendOrigins = configuredFrontendOrigins(frontendOrigin)
   const app = express()
 
   app.use(express.json())
-  app.use((_req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*')
+  app.use((req, res, next) => {
+    const origin = req.get('Origin')?.replace(/\/$/, '')
+    if (!origin) {
+      next()
+      return
+    }
+    if (!isLocalDevelopmentOrigin(origin) && !allowedFrontendOrigins.has(origin)) {
+      res.status(403).json({ error: 'Origen no permitido' })
+      return
+    }
+    res.setHeader('Access-Control-Allow-Origin', origin)
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+    res.setHeader('Vary', 'Origin')
     next()
   })
   app.options('*', (_req, res) => res.sendStatus(204))
