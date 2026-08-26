@@ -1,4 +1,4 @@
-import { cp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { copyFile, cp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url))
@@ -17,6 +17,11 @@ if (process.env.VERCEL && !configuredApiUrl) {
 await rm(outputDirectory, { recursive: true, force: true })
 await mkdir(outputDirectory, { recursive: true })
 await cp(sourceDirectory, outputDirectory, { recursive: true })
+await mkdir(new URL('../dist/web/widget/', import.meta.url), { recursive: true })
+await copyFile(
+  new URL('../dist/web/index.html', import.meta.url),
+  new URL('../dist/web/widget/index.html', import.meta.url),
+)
 await writeFile(
   new URL('../dist/web/config.js', import.meta.url),
   `window.__SBA_CONFIG__ = Object.freeze({ apiUrl: ${JSON.stringify(configuredApiUrl)} })\n`,

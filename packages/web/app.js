@@ -7,6 +7,10 @@ const standaloneLocalWeb = localBrowser && ['5173', '5500', '5701'].includes(win
 const apiBase = queryApi || configuredApi || (standaloneLocalWeb ? 'http://localhost:3001' : window.location.origin)
 const API = apiBase.replace(/\/$/, '')
 const endpoints = { health: `${API}/health`, products: `${API}/products`, bundle: `${API}/bundle` }
+const widgetMode = /^\/widget\/?$/.test(window.location.pathname)
+
+document.documentElement.classList.toggle('widget-route', widgetMode)
+document.body.classList.toggle('widget-mode', widgetMode)
 
 class ApiRequestError extends Error {
   constructor(message, kind, status) {
@@ -255,7 +259,11 @@ async function initialize() {
       return option
     }))
     updateCategoryCopy(selectedCategory)
-    await loadProducts()
+    if (widgetMode) {
+      renderSource({ source: health.catalogProvider })
+    } else {
+      await loadProducts()
+    }
   } catch (error) {
     elements.grid.replaceChildren()
     elements.message.textContent = connectionHelp(error)
@@ -270,6 +278,7 @@ function openDrawer() {
   requestAnimationFrame(() => elements.chatInput.focus())
 }
 function closeDrawer() {
+  if (widgetMode) return
   elements.drawer.hidden = true; elements.backdrop.hidden = true
   document.body.classList.remove('drawer-open')
   if (lastFocusedElement instanceof HTMLElement) lastFocusedElement.focus()
@@ -549,12 +558,21 @@ async function sendBundle(payload, userLabel) {
   }
 }
 
-elements.searchForm.addEventListener('submit', (event) => { event.preventDefault(); loadProducts(elements.search.value.trim()) })
+if (widgetMode) {
+  document.title = 'Smart Bundle AI · Agente de compra'
+  elements.drawer.hidden = false
+  elements.backdrop.hidden = true
+  elements.drawer.setAttribute('role', 'main')
+  elements.drawer.removeAttribute('aria-modal')
+  elements.close.hidden = true
+} else {
+  elements.searchForm.addEventListener('submit', (event) => { event.preventDefault(); loadProducts(elements.search.value.trim()) })
+}
 elements.launcher.addEventListener('click', openDrawer)
 elements.heroLauncher.addEventListener('click', openDrawer)
 elements.close.addEventListener('click', closeDrawer)
 elements.backdrop.addEventListener('click', closeDrawer)
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !elements.drawer.hidden) closeDrawer() })
+document.addEventListener('keydown', (event) => { if (!widgetMode && event.key === 'Escape' && !elements.drawer.hidden) closeDrawer() })
 elements.category.addEventListener('change', () => { selectedCategory = elements.category.value; updateCategoryCopy(selectedCategory) })
 
 elements.chatForm.addEventListener('submit', async (event) => {
