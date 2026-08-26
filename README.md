@@ -8,8 +8,8 @@ sin pasarse ni un peso, y si algo no tiene stock lo reemplaza por un producto eq
 
 ```
 packages/
-├─ core/    lógica de negocio pura — sin Express, sin n8n, sin SDK de Claude
-├─ api/     servidor HTTP, adaptador Carrefour/VTEX y fallback local
+├─ core/    lógica de negocio pura — sin Express, sin n8n, sin SDK de proveedor
+├─ api/     servidor HTTP, adaptadores Carrefour/VTEX y Lenaldi, y fallback local
 └─ web/     página estática (HTML/CSS/JS sin build) que llama a la API
 n8n/         workflow importable: Webhook → HTTP Request → Respond
 ```
@@ -26,7 +26,7 @@ maximizar cuánto del presupuesto se usa sin pasarse. Se resuelve con programaci
 y determinística — mismo catálogo y mismo presupuesto dan siempre el mismo resultado. Pedirle esto
 a un LLM sería arriesgar la única promesa que no puede fallar (no pasarse del presupuesto) a cambio
 de nada: no hay ambigüedad que resolver, es matemática pura. La IA entra donde sí hace falta:
-entender el pedido en lenguaje natural y redactar la explicación — nunca calculando el total.
+ entender el pedido en lenguaje natural — nunca calculando el total ni inventando datos comerciales.
 
 **n8n no puede `require()` el código del repo desde un Code node.** El Code node de n8n corre en
 un sandbox: solo puede importar paquetes npm instalados dentro de la carpeta de n8n y habilitados
@@ -41,17 +41,20 @@ Necesitás Node 22+.
 
 ```bash
 npm install
-npm run build:api
+npm run build
 ```
 
-Después, dos terminales:
+Para probar la aplicación completa desde un único origen:
 
 ```bash
 npm run dev:api    # API en :3001
-npm run dev:web    # web en :5500 (o abrí packages/web/index.html con Live Server)
 ```
 
-Abrí `http://localhost:5500`.
+Abrí `http://localhost:3001`. El backend sirve también la landing, por lo que no necesita CORS.
+
+Si querés servir el frontend separado con `npm run dev:web`, la web detecta ese modo local y usa
+`http://localhost:3001` automáticamente. El parámetro `?api=http://localhost:3001` sigue disponible
+para pruebas puntuales. En producción `VITE_API_URL` se incorpora durante el build de Vercel.
 
 ## Variables de entorno
 
@@ -71,8 +74,60 @@ Para trabajar siempre con el catálogo histórico:
 ECOMMERCE_PROVIDER=local
 ```
 
-`ANTHROPIC_API_KEY` sigue siendo opcional. Sin ella, el sistema usa `StubIntentParser` y
+Para usar la integración demostrativa de solo lectura con las páginas públicas de Lenaldi:
+
+```bash
+ECOMMERCE_PROVIDER=lenaldi
+LENALDI_CACHE_TTL_SECONDS=900
+LENALDI_WHATSAPP_NUMBER=
+```
+
+Este proveedor consulta una vez por ciclo de caché las páginas públicas de Adidas, New Balance,
+Nike, Puma y Vans alojadas en Google Sites. Normaliza únicamente nombre, marca, precio, imagen,
+URL de origen y el enlace público “Hace tu pedido” cuando existe. No interpreta el ID interno como
+SKU y no inventa stock, talles, promociones ni señales de calidad. Si Google Sites rechaza o demora
+la consulta, el adaptador usa la última copia disponible en memoria o el fallback local existente.
+Las imágenes se sirven mediante `/catalog-image`, un proxy restringido a los recursos públicos de
+Lenaldi, porque Google rechaza el hotlink directo fuera de Sites. El endpoint reduce y cachea las
+imágenes; no acepta dominios arbitrarios.
+La demostración no implica una asociación comercial oficial con Lenaldi.
+
+`GEMINI_API_KEY` sigue siendo opcional. Sin ella, el sistema usa `StubIntentParser` y
 `StubExplainer`, conservando el cálculo determinístico.
+
+Cuando frontend y backend se publican por separado se usan estas variables adicionales:
+
+```bash
+# Backend: origen público exacto de Vercel (admite una lista separada por comas)
+FRONTEND_ORIGIN=https://smart-bundle-ai.vercel.app
+
+# Frontend: URL pública del Web Service de Render, sin barra final
+VITE_API_URL=https://smart-bundle-ai-api.onrender.com
+```
+
+`VITE_API_URL` es pública y solo contiene la dirección de la API. `GEMINI_API_KEY` nunca forma
+parte del build del frontend. Los orígenes `http://localhost` y `http://127.0.0.1` permanecen
+habilitados para desarrollo.
+
+## Publicación: Render + Vercel + Google Sites
+
+El orden de publicación es backend primero y frontend después:
+
+1. En Render crear un **Web Service** desde la raíz del repositorio. Usar
+   `npm ci && npm run build:api` como Build Command y
+   `npm start --workspace=@sba/api` como Start Command. Configurar `/health` como Health Check.
+2. Cargar en Render `ECOMMERCE_PROVIDER=lenaldi`, `GEMINI_API_KEY`,
+   `LENALDI_WHATSAPP_NUMBER=5491178236492` y `LENALDI_CACHE_TTL_SECONDS=900`. Dejar
+   `FRONTEND_ORIGIN` vacío hasta obtener la URL de Vercel. Render define `PORT`; no hay que fijarlo.
+3. Copiar la URL HTTPS generada por Render.
+4. En Vercel importar la raíz del repositorio, elegir preset **Other**, ejecutar
+   `npm run build:web` y publicar `dist/web`. Crear `VITE_API_URL` con la URL copiada de Render.
+5. Copiar la URL de producción de Vercel, reemplazar `FRONTEND_ORIGIN` en Render por esa URL exacta
+   y reiniciar el servicio. Probar `/health`, una recomendación y el traspaso a WhatsApp.
+
+La URL de Vercel es la que debe vincularse desde el botón de Google Sites. También se puede probar
+**Insertar → Incorporar → URL**; el botón enlazado sigue siendo la alternativa más compatible con
+Google Sites.
 
 ## Probar la sustitución
 
@@ -80,6 +135,25 @@ En modo `ECOMMERCE_PROVIDER=local`, el catálogo de prueba tiene a propósito do
 stock con un reemplazo real disponible: "Detergente Ala 750ml" (reemplazado por "Detergente Skip
 900ml") y "Perfume mini 30ml" (reemplazado por otra fragancia). En la web, escribí "detergente" en
 el campo de producto puntual y vas a ver la sustitución explicada.
+
+## Motor de decision y politicas demo
+
+`POST /bundle` acepta `strategy` con uno de estos valores: `lowest-cost`, `balanced`,
+`quality-first` o `maximize-budget`. El motor cubre primero la necesidad principal y sus slots
+complementarios; el precio utilizado queda como desempate, salvo cuando la estrategia elegida lo
+convierte explicitamente en objetivo.
+
+Las senales `qualityScore` y `valueScore` son opcionales. VTEX no las inventa: quedan ausentes si el
+retailer no las publica. Los productos agregados a `catalog.json` para lavar ropa si incluyen esas
+senales y sus nombres indican `Demo`; existen unicamente para demostrar decisiones diferenciadas.
+Lenaldi tampoco publica una señal explícita de calidad; por eso `quality-first` conserva la decisión
+equilibrada e informa que esa estrategia no puede evaluarse con los datos reales del sitio.
+
+La API aplica `Politicas comerciales de demostracion`: beneficio maximo del 5%, minimo tres
+productos, sin acumularlo sobre productos que ya tengan promocion del ecommerce y sin aplicarlo a
+la categoria tecnologia. La respuesta separa subtotal observado, ahorro del ecommerce, beneficio
+Smart Bundle demo, total final y presupuesto restante. Estas reglas no representan politicas reales
+de Carrefour ni informacion de margen.
 
 ## Tests
 

@@ -1,231 +1,633 @@
-// Apunta directo a la API por default: hace que la demo funcione siempre,
-// sin depender de que n8n esté corriendo y con el workflow activo.
-// `?api=http://localhost:3101` permite apuntar una vista previa a otra API
-// sin guardar configuracion ni secretos en el frontend.
-const apiBase = new URLSearchParams(window.location.search).get('api') || 'https://smart-bundle-ai-0-1.onrender.com';
-const ENDPOINT = `${apiBase.replace(/\/$/, '')}/bundle`
-const HEALTH_ENDPOINT = `${apiBase.replace(/\/$/, '')}/health`
+const queryApi = new URLSearchParams(window.location.search).get('api')
+const configuredApi = typeof window.__SBA_CONFIG__?.apiUrl === 'string'
+  ? window.__SBA_CONFIG__.apiUrl.trim()
+  : ''
+const localBrowser = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+const standaloneLocalWeb = localBrowser && ['5173', '5500', '5701'].includes(window.location.port)
+const apiBase = queryApi || configuredApi || (standaloneLocalWeb ? 'http://localhost:3001' : window.location.origin)
+const API = apiBase.replace(/\/$/, '')
+const endpoints = { health: `${API}/health`, products: `${API}/products`, bundle: `${API}/bundle` }
+const widgetMode = /^\/widget\/?$/.test(window.location.pathname)
 
-const CATEGORY_LABELS = {
-  'limpieza': '🧽 Limpieza',
-  'tecnologia': '💻 Tecnología',
-  'cuidado-personal': '🧴 Cuidado personal',
+document.documentElement.classList.toggle('widget-route', widgetMode)
+document.body.classList.toggle('widget-mode', widgetMode)
+
+class ApiRequestError extends Error {
+  constructor(message, kind, status) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.kind = kind
+    this.status = status
+  }
 }
 
-const statusEl = document.getElementById('status')
-const chipsEl = document.getElementById('category-chips')
-const budgetSlider = document.getElementById('budget-slider')
-const budgetNumber = document.getElementById('budget-number')
-const form = document.getElementById('bundle-form')
-const submitBtn = document.getElementById('submit-btn')
-const resultEl = document.getElementById('result')
-const emptyResultEl = document.getElementById('empty-result')
-const errorEl = document.getElementById('error')
-
-const priceFormatter = new Intl.NumberFormat('es-AR', {
-  style: 'currency',
-  currency: 'ARS',
-  maximumFractionDigits: 2,
-})
-
-let selectedCategory = null
-
-function setStatus(text, kind) {
-  statusEl.textContent = text
-  statusEl.className = `status-pill status-pill--${kind}`
-}
-
-function renderChips(categories) {
-  chipsEl.innerHTML = ''
-  categories.forEach((cat, i) => {
-    const chip = document.createElement('button')
-    chip.type = 'button'
-    chip.className = 'chip'
-    chip.setAttribute('role', 'radio')
-    chip.setAttribute('aria-checked', i === 0 ? 'true' : 'false')
-    chip.textContent = CATEGORY_LABELS[cat] ?? cat
-    chip.dataset.category = cat
-    chip.addEventListener('click', () => selectCategory(cat))
-    chipsEl.appendChild(chip)
-  })
-  if (categories.length > 0) selectedCategory = categories[0]
-}
-
-function selectCategory(cat) {
-  selectedCategory = cat
-  ;[...chipsEl.children].forEach((chip) => {
-    chip.setAttribute('aria-checked', String(chip.dataset.category === cat))
-  })
-}
-
-async function checkHealth() {
+async function requestJson(url, options) {
+  let response
   try {
-    const res = await fetch(HEALTH_ENDPOINT)
-    const body = await res.json()
-    renderChips(body.categories)
-    const catalogName = body.catalogProvider === 'vtex' ? 'Carrefour/VTEX' : 'local'
-    setStatus(
-      `conectado · catálogo: ${catalogName} · IA: ${body.aiEnabled ? 'Claude' : 'reglas'}`,
-      'ok',
-    )
+    response = await fetch(url, options)
+  } catch (error) {
+    if (localBrowser) console.error('[Smart Bundle] Error de red', error)
+    throw new ApiRequestError(`No se pudo conectar con la API en ${API}`, 'network')
+  }
+
+  const raw = await response.text()
+  let data = null
+  if (raw) {
+    try {
+      data = JSON.parse(raw)
+    } catch (error) {
+      if (localBrowser) console.error('[Smart Bundle] Respuesta no JSON', error)
+      throw new ApiRequestError(`La API respondió HTTP ${response.status} con un formato inválido`, 'configuration', response.status)
+    }
+  }
+  if (!response.ok) {
+    throw new ApiRequestError(data?.error || `La API respondió HTTP ${response.status}`, 'http', response.status)
+  }
+  return data
+}
+
+function connectionHelp(error) {
+  const detail = error instanceof Error ? error.message : 'Error desconocido'
+  if (!(error instanceof ApiRequestError) || error.kind === 'http') return detail
+  return localBrowser
+    ? `${detail}. Verificá que el backend esté activo con npm run dev:api.`
+    : `${detail}. Verificá VITE_API_URL y que el backend de Render esté activo.`
+}
+
+const CATEGORY_LABELS = { limpieza: 'Limpieza', tecnologia: 'Tecnología', 'cuidado-personal': 'Cuidado personal', zapatillas: 'Zapatillas' }
+const STRATEGY_LABELS = { 'lowest-cost': 'Más económico', balanced: 'Equilibrado', 'quality-first': 'Priorizar calidad', 'maximize-budget': 'Aprovechar presupuesto' }
+const priceFormatter = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 })
+
+const elements = {
+  nav: document.getElementById('category-nav'), grid: document.getElementById('product-grid'), message: document.getElementById('catalog-message'),
+  badge: document.getElementById('source-badge'), heroSignal: document.getElementById('hero-signal'), drawerIntro: document.getElementById('drawer-intro'),
+  searchForm: document.getElementById('search-form'), search: document.getElementById('store-search'), launcher: document.getElementById('agent-launcher'),
+  heroLauncher: document.getElementById('hero-agent-button'), drawer: document.getElementById('agent-drawer'), backdrop: document.getElementById('drawer-backdrop'),
+  close: document.getElementById('drawer-close'), thread: document.getElementById('chat-thread'), chatForm: document.getElementById('chat-form'),
+  chatInput: document.getElementById('chat-input'), chatSubmit: document.getElementById('chat-submit'), typing: document.getElementById('typing-indicator'),
+  manual: document.getElementById('manual-config'), form: document.getElementById('bundle-form'), category: document.getElementById('bundle-category'),
+  budget: document.getElementById('budget-number'), required: document.getElementById('required-product'), preferences: document.getElementById('preferences'),
+  submit: document.getElementById('submit-btn'), hint: document.getElementById('form-hint'), result: document.getElementById('result'),
+  empty: document.getElementById('empty-result'), error: document.getElementById('error'),
+  accept: document.getElementById('accept-recommendation'), cart: document.querySelector('.cart-button'),
+}
+
+let selectedCategory = 'limpieza'
+let lastFocusedElement = null
+let lastBundleResponse = null
+let conversationId = null
+let requestInFlight = false
+
+function sourceLabel(catalog) {
+  if (catalog?.source === 'lenaldi') return 'Catálogo: Lenaldi — datos públicos del sitio'
+  if (catalog?.source === 'vtex') return 'Demo con catálogo público VTEX'
+  if (catalog?.source === 'local-fallback') return 'Modo demostración — catálogo local (respaldo)'
+  return 'Modo demostración — catálogo local'
+}
+
+function renderSource(catalog) {
+  elements.badge.textContent = sourceLabel(catalog)
+  const sourceClass = catalog?.source === 'vtex' ? 'source-badge--vtex' : catalog?.source === 'lenaldi' ? 'source-badge--lenaldi' : 'source-badge--local'
+  elements.badge.className = `source-badge ${sourceClass}`
+  const lenaldi = catalog?.source === 'lenaldi'
+  elements.heroSignal.textContent = lenaldi ? 'Presupuesto + preferencias + datos públicos' : 'Presupuesto + preferencias + stock real'
+  elements.drawerIntro.textContent = lenaldi
+    ? 'Decime qué zapatillas buscás y cuánto querés gastar. Voy a interpretar tu pedido y comparar los datos públicos disponibles.'
+    : 'Decime qué necesitás y cuánto querés gastar. Voy a interpretar tu pedido y reoptimizar cada respuesta.'
+}
+
+function catalogImageUrl(product) {
+  if (!product?.imageUrl || !product?.productUrl) return product?.imageUrl
+  try {
+    const image = new URL(product.imageUrl)
+    const page = new URL(product.productUrl)
+    if (image.hostname !== 'lh3.googleusercontent.com' || !image.pathname.startsWith('/sitesv/')) return product.imageUrl
+    if (page.hostname !== 'sites.google.com' || !page.pathname.startsWith('/view/lenaldi/')) return product.imageUrl
+    const query = new URLSearchParams({ url: image.toString(), page: page.toString() })
+    return `${API}/catalog-image?${query}`
   } catch {
-    setStatus('no se pudo conectar con la API en :3001 — ¿corriste `npm run dev:api`?', 'err')
-    chipsEl.innerHTML = '<p class="chip-placeholder">sin conexión con la API</p>'
+    return product.imageUrl
   }
 }
 
-// slider <-> número sincronizados
-budgetSlider.addEventListener('input', () => { budgetNumber.value = budgetSlider.value })
-budgetNumber.addEventListener('input', () => {
-  const val = Number(budgetNumber.value)
-  if (!Number.isNaN(val) && val >= Number(budgetSlider.min) && val <= Number(budgetSlider.max)) {
-    budgetSlider.value = String(val)
-  }
-})
-
-function setLoading(loading) {
-  submitBtn.disabled = loading
-  submitBtn.dataset.loading = String(loading)
-  submitBtn.querySelector('.btn-label').textContent = loading ? 'Armando…' : 'Armar combo'
+function productPlaceholder() {
+  const placeholder = document.createElement('span')
+  placeholder.className = 'product-placeholder'
+  placeholder.textContent = '📦'
+  placeholder.setAttribute('aria-hidden', 'true')
+  return placeholder
 }
 
-function hideResults() {
-  resultEl.hidden = true
-  emptyResultEl.hidden = true
-  errorEl.hidden = true
+function renderLoading() {
+  elements.grid.replaceChildren(...Array.from({ length: 8 }, () => {
+    const card = document.createElement('div')
+    card.className = 'skeleton'
+    card.setAttribute('aria-hidden', 'true')
+    return card
+  }))
+  elements.message.textContent = 'Cargando productos…'
 }
 
-function renderReceipt(data) {
-  hideResults()
-
-  if (data.bundle.items.length === 0) {
-    document.getElementById('empty-message').textContent =
-      `No encontramos productos de ${data.request.category} que entren en $${data.request.maxBudget}. Probá con más presupuesto.`
-    emptyResultEl.hidden = false
-    return
+function productCard(product) {
+  const card = document.createElement('article')
+  card.className = 'product-card'
+  const media = document.createElement('div')
+  media.className = 'product-media'
+  if (product.listPrice > product.price) {
+    const tag = document.createElement('span')
+    tag.className = 'promo-tag'
+    tag.textContent = 'Precio promocional'
+    media.appendChild(tag)
   }
-
-  resultEl.hidden = false
-  document.getElementById('explanation').textContent = data.explanation
-  document.getElementById('engine-badge').textContent =
-    `motor: ${data.usedAI ? 'Claude' : 'reglas / stub'}`
-  const catalogBadge = document.getElementById('catalog-badge')
-  const isVtex = data.catalog?.source === 'vtex'
-  catalogBadge.textContent = isVtex
-    ? 'datos: Carrefour / VTEX'
-    : data.catalog?.source === 'local-fallback'
-      ? 'datos: local (fallback VTEX)'
-      : 'datos: catálogo local'
-  catalogBadge.className = `catalog-badge ${isVtex ? 'catalog-badge--vtex' : 'catalog-badge--local'}`
-
-  const itemsEl = document.getElementById('items')
-  itemsEl.innerHTML = ''
-  for (const item of data.bundle.items) {
-    const li = document.createElement('li')
-
-    const product = document.createElement('div')
-    product.className = 'item-product'
-    if (item.imageUrl) {
-      const image = document.createElement('img')
-      image.className = 'item-image'
-      image.src = item.imageUrl
-      image.alt = ''
-      image.loading = 'lazy'
-      product.appendChild(image)
-    }
-
-    const description = document.createElement('div')
-    description.className = 'item-description'
-    const name = item.productUrl ? document.createElement('a') : document.createElement('span')
-    name.textContent = item.name
-    name.className = 'item-name'
-    if (item.productUrl) {
-      name.href = item.productUrl
-      name.target = '_blank'
-      name.rel = 'noreferrer'
-    }
-    description.appendChild(name)
-    if (item.seller) {
-      const seller = document.createElement('small')
-      seller.textContent = `Vendido por ${item.seller}`
-      description.appendChild(seller)
-    }
-    product.appendChild(description)
-
-    const price = document.createElement('span')
-    price.className = 'item-price'
-    if (item.listPrice && item.listPrice > item.price) {
-      const previous = document.createElement('del')
-      previous.textContent = priceFormatter.format(item.listPrice)
-      price.appendChild(previous)
-    }
-    const current = document.createElement('span')
-    current.textContent = priceFormatter.format(item.price)
-    price.appendChild(current)
-    li.append(product, price)
-    itemsEl.appendChild(li)
+  if (product.imageUrl) {
+    const image = document.createElement('img')
+    image.src = catalogImageUrl(product)
+    image.alt = product.name
+    image.loading = 'lazy'
+    image.addEventListener('error', () => image.replaceWith(productPlaceholder()), { once: true })
+    media.appendChild(image)
+  } else {
+    media.appendChild(productPlaceholder())
   }
-
-  const subsEl = document.getElementById('subs')
-  subsEl.innerHTML = ''
-  for (const sub of data.bundle.substitutions) {
-    const note = document.createElement('p')
-    if (sub.replacement) {
-      note.className = 'sub-note'
-      note.innerHTML = `🔁 No había <strong>${sub.outOfStock.name}</strong>, lo cambiamos por <strong>${sub.replacement.name}</strong>.`
-    } else {
-      note.className = 'sub-note sub-note--missing'
-      note.innerHTML = `⚠️ No había <strong>${sub.outOfStock.name}</strong> ni encontramos un reemplazo en esa categoría.`
-    }
-    subsEl.appendChild(note)
+  const body = document.createElement('div')
+  body.className = 'product-body'
+  const category = document.createElement('p')
+  category.className = 'product-category'
+  category.textContent = CATEGORY_LABELS[product.category] ?? product.category
+  const name = product.productUrl ? document.createElement('a') : document.createElement('span')
+  name.className = 'product-name'
+  name.textContent = product.name
+  if (product.productUrl) { name.href = product.productUrl; name.target = '_blank'; name.rel = 'noreferrer' }
+  const seller = document.createElement('p')
+  seller.className = 'seller'
+  seller.textContent = product.seller ? `Vendido por ${product.seller}` : product.source === 'lenaldi' ? `Marca: ${product.brand ?? 'no informada'}` : 'Producto de demostración'
+  const priceBlock = document.createElement('div')
+  priceBlock.className = 'price-block'
+  const oldPrice = document.createElement('del')
+  oldPrice.className = 'old-price'
+  oldPrice.textContent = product.listPrice > product.price ? priceFormatter.format(product.listPrice) : ''
+  const price = document.createElement('span')
+  price.className = 'price'
+  price.textContent = priceFormatter.format(product.price)
+  const availability = document.createElement('span')
+  availability.className = 'availability'
+  availability.textContent = product.inStock == null ? 'Disponibilidad no informada por la tienda' : product.inStock ? 'Disponible' : 'Sin stock'
+  if (product.inStock == null) availability.classList.add('availability--unknown')
+  priceBlock.append(oldPrice, price, availability)
+  const useButton = document.createElement('button')
+  useButton.className = 'use-product'
+  useButton.type = 'button'
+  useButton.disabled = product.inStock === false
+  useButton.textContent = product.inStock === false ? 'No disponible' : 'Pedirle al agente'
+  useButton.addEventListener('click', () => {
+    selectedCategory = product.category
+    elements.category.value = product.category
+    elements.required.value = product.name
+    elements.chatInput.value = `Quiero ${product.name}`
+    openDrawer()
+  })
+  body.append(category, name, seller, priceBlock, useButton)
+  if (product.orderUrl) {
+    const orderLink = document.createElement('a')
+    orderLink.className = 'order-link'
+    orderLink.href = product.orderUrl
+    orderLink.target = '_blank'
+    orderLink.rel = 'noreferrer'
+    orderLink.textContent = 'Hacé tu pedido'
+    body.appendChild(orderLink)
   }
-
-  const { totalPrice, leftoverBudget } = data.bundle
-  const budgetTotal = totalPrice + leftoverBudget
-  const pctUsed = budgetTotal > 0 ? Math.round((totalPrice / budgetTotal) * 100) : 0
-  document.getElementById('budget-bar-fill').style.width = `${pctUsed}%`
-  document.getElementById('total-label').textContent = `Total: ${priceFormatter.format(totalPrice)}`
-  document.getElementById('leftover-label').textContent = `margen libre: ${priceFormatter.format(leftoverBudget)}`
+  card.append(media, body)
+  return card
 }
 
-function renderError(message) {
-  hideResults()
-  errorEl.hidden = false
-  errorEl.textContent = message
-}
-
-form.addEventListener('submit', async (e) => {
-  e.preventDefault()
-  setLoading(true)
-
+async function loadProducts(search = '') {
+  renderLoading()
   try {
-    const freeText = document.getElementById('freeText').value.trim()
-    const preferenceRaw = document.getElementById('preference').value.trim()
-    const preferences = preferenceRaw ? [preferenceRaw] : []
+    const query = new URLSearchParams({ category: selectedCategory })
+    if (search) query.set('search', search)
+    const data = await requestJson(`${endpoints.products}?${query}`)
+    renderSource(data.catalog)
+    elements.grid.replaceChildren(...data.products.map(productCard))
+    elements.message.textContent = data.products.length
+      ? data.catalog?.source === 'lenaldi'
+        ? `${data.products.length} resultado${data.products.length === 1 ? '' : 's'} del catálogo público${search ? ` para “${search}”` : ''}.`
+        : `${data.products.length} producto${data.products.length === 1 ? '' : 's'} disponible${data.products.length === 1 ? '' : 's'}${search ? ` para “${search}”` : ''}.`
+      : `No encontramos resultados${search ? ` para “${search}”` : ''}.`
+  } catch (error) {
+    elements.grid.replaceChildren()
+    elements.message.textContent = `No se pudo consultar el catálogo: ${connectionHelp(error)}`
+    elements.badge.textContent = 'API no disponible'
+    elements.badge.className = 'source-badge source-badge--local'
+  }
+}
 
-    // El texto libre reemplaza categoría/presupuesto explícitos cuando está
-    // completo — es el camino que ejercita el parser de intención (IA o stub).
-    const payload = freeText
-      ? { freeText, preferences }
-      : { category: selectedCategory, maxBudget: Number(budgetNumber.value), preferences }
+function selectCategory(category) {
+  selectedCategory = category
+  elements.category.value = category
+  ;[...elements.nav.children].forEach((button) => button.setAttribute('aria-current', String(button.dataset.category === category)))
+  elements.search.value = ''
+  updateCategoryCopy(category)
+  loadProducts()
+}
 
-    const res = await fetch(ENDPOINT, {
+function updateCategoryCopy(category) {
+  const footwear = category === 'zapatillas'
+  elements.required.placeholder = footwear ? 'Ej: Nike Dunk' : 'Ej: detergente'
+  elements.preferences.placeholder = footwear ? 'Ej: claras, casual, uso diario' : 'Ej: económico, sin perfume, no lavandina'
+  elements.hint.textContent = footwear ? 'Podés indicar marca, color, modelo, presupuesto, estilo o uso.' : 'Podés escribir “económico”, “sin perfume” o “no lavandina”.'
+  elements.budget.min = footwear ? '10000' : '100'
+  elements.budget.step = footwear ? '1000' : '100'
+  if (footwear && Number(elements.budget.value) < 10000) elements.budget.value = '75000'
+}
+
+async function initialize() {
+  renderLoading()
+  try {
+    const health = await requestJson(endpoints.health)
+    selectedCategory = health.categories.includes('zapatillas') ? 'zapatillas' : health.categories.includes('limpieza') ? 'limpieza' : health.categories[0]
+    elements.nav.replaceChildren(...health.categories.map((category) => {
+      const button = document.createElement('button')
+      button.type = 'button'; button.className = 'category-link'; button.dataset.category = category
+      button.textContent = CATEGORY_LABELS[category] ?? category
+      button.setAttribute('aria-current', String(category === selectedCategory))
+      button.addEventListener('click', () => selectCategory(category))
+      return button
+    }))
+    elements.category.replaceChildren(...health.categories.map((category) => {
+      const option = document.createElement('option')
+      option.value = category; option.textContent = CATEGORY_LABELS[category] ?? category; option.selected = category === selectedCategory
+      return option
+    }))
+    updateCategoryCopy(selectedCategory)
+    if (widgetMode) {
+      renderSource({ source: health.catalogProvider })
+    } else {
+      await loadProducts()
+    }
+  } catch (error) {
+    elements.grid.replaceChildren()
+    elements.message.textContent = connectionHelp(error)
+    elements.badge.textContent = 'API no disponible'
+  }
+}
+
+function openDrawer() {
+  lastFocusedElement = document.activeElement
+  elements.drawer.hidden = false; elements.backdrop.hidden = false
+  document.body.classList.add('drawer-open')
+  requestAnimationFrame(() => elements.chatInput.focus())
+}
+function closeDrawer() {
+  if (widgetMode) return
+  elements.drawer.hidden = true; elements.backdrop.hidden = true
+  document.body.classList.remove('drawer-open')
+  if (lastFocusedElement instanceof HTMLElement) lastFocusedElement.focus()
+}
+
+function parsePreferences(value) {
+  const preferredTags = [], excludedTags = [], avoidedProducts = []
+  for (const part of value.split(',').map((item) => item.trim()).filter(Boolean)) {
+    const avoided = part.match(/\b(?:no quiero|no|evitar?)\s+(.+)$/i)
+    const excluded = part.match(/\bsin\s+(.+)$/i)
+    if (avoided) avoidedProducts.push(avoided[1].trim())
+    else if (excluded) excludedTags.push(excluded[1].trim())
+    else if (/\b(econ[oó]mico|barato|ahorro)\b/i.test(part)) preferredTags.push('economico')
+    else preferredTags.push(part.replace(/^(quiero|prefiero|busco)\s+(productos?\s+)?/i, '').trim())
+  }
+  return { preferredTags, excludedTags, avoidedProducts }
+}
+
+function conversationalPayload(message) {
+  return { ...(conversationId ? { conversationId } : {}), freeText: message }
+}
+function actionPayload(strategy, label, tryAlternative = false) {
+  if (!conversationId || !lastBundleResponse) return null
+  return {
+    conversationId,
+    freeText: label,
+    strategy,
+    action: tryAlternative ? 'alternative' : 'strategy',
+  }
+}
+
+function appendChatMessage(role, text) {
+  const message = document.createElement('article')
+  message.className = `chat-message chat-message--${role}`
+  if (role === 'assistant') {
+    const avatar = document.createElement('span')
+    avatar.className = 'chat-avatar'; avatar.setAttribute('aria-hidden', 'true'); avatar.textContent = 'AI'
+    message.appendChild(avatar)
+  }
+  const bubble = document.createElement('div')
+  bubble.className = 'chat-bubble'
+  const paragraph = document.createElement('p')
+  paragraph.textContent = text
+  bubble.appendChild(paragraph); message.appendChild(bubble)
+  elements.thread.insertBefore(message, elements.typing)
+  scrollChat()
+}
+
+function renderWhatsAppHandoff(data) {
+  conversationId = data.conversationId
+  const article = document.createElement('article')
+  article.className = 'chat-message chat-message--assistant whatsapp-handoff'
+  const avatar = document.createElement('span')
+  avatar.className = 'chat-avatar'; avatar.setAttribute('aria-hidden', 'true'); avatar.textContent = 'AI'
+  const bubble = document.createElement('div')
+  bubble.className = 'chat-bubble whatsapp-handoff__bubble'
+  const heading = document.createElement('strong')
+  heading.textContent = data.confirmation
+  const message = document.createElement('p')
+  message.textContent = data.message
+  bubble.append(heading, message)
+
+  if (!data.whatsappHandoff.prefillSupported) {
+    const note = document.createElement('p')
+    note.className = 'whatsapp-handoff__note'
+    note.textContent = 'El canal no admite texto prearmado. Copiá este mensaje y pegalo al abrir WhatsApp:'
+    const preview = document.createElement('textarea')
+    preview.className = 'whatsapp-handoff__message'
+    preview.readOnly = true
+    preview.rows = 4
+    preview.value = data.whatsappHandoff.message
+    const copy = document.createElement('button')
+    copy.type = 'button'; copy.className = 'whatsapp-copy'; copy.textContent = 'Copiar mensaje'
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(data.whatsappHandoff.message)
+        copy.textContent = 'Mensaje copiado'
+      } catch {
+        preview.focus(); preview.select(); copy.textContent = 'Seleccionado para copiar'
+      }
+    })
+    bubble.append(note, preview, copy)
+  }
+
+  const link = document.createElement('a')
+  link.className = 'whatsapp-continue'
+  link.href = data.whatsappHandoff.url
+  link.target = '_blank'
+  link.rel = 'noreferrer'
+  link.textContent = 'Continuar compra por WhatsApp'
+  link.addEventListener('click', () => {
+    if (!data.whatsappHandoff.prefillSupported) {
+      navigator.clipboard?.writeText(data.whatsappHandoff.message).catch(() => {})
+    }
+    fetch(`${API}/conversations/${encodeURIComponent(data.conversationId)}/whatsapp-click`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    const data = await res.json()
+      body: JSON.stringify({ recommendationId: data.recommendationId }),
+      keepalive: true,
+    }).catch(() => {})
+  })
+  bubble.appendChild(link)
+  article.append(avatar, bubble)
+  elements.thread.insertBefore(article, elements.typing)
 
-    if (!res.ok) {
-      renderError(data.error ?? 'Error desconocido')
-    } else {
-      renderReceipt(data)
-    }
-  } catch (err) {
-    renderError(`No se pudo conectar: ${err.message}`)
-  } finally {
-    setLoading(false)
+  const count = data.cart?.items?.length ?? 0
+  elements.cart.querySelector('b').textContent = String(count)
+  elements.cart.setAttribute('aria-label', `Carrito Smart Bundle, ${count} producto${count === 1 ? '' : 's'}`)
+  elements.cart.title = 'Selección preparada para continuar por WhatsApp'
+  scrollChat()
+}
+function scrollChat() { requestAnimationFrame(() => { elements.thread.scrollTop = elements.thread.scrollHeight }) }
+function hideBundleStates() { elements.result.hidden = true; elements.empty.hidden = true; elements.error.hidden = true }
+function archiveCurrentRecommendation() {
+  if (elements.result.hidden) return
+  const archived = elements.result.cloneNode(true)
+  archived.removeAttribute('id')
+  archived.classList.add('bundle-result--history')
+  archived.querySelectorAll('[id]').forEach((node) => node.removeAttribute('id'))
+  archived.querySelector('.decision-actions')?.remove()
+  archived.querySelector('.accept-recommendation')?.remove()
+  const heading = archived.querySelector('.result-heading h3')
+  if (heading) heading.textContent = 'Recomendación anterior'
+  elements.thread.insertBefore(archived, elements.typing)
+  elements.result.hidden = true
+}
+function setBusy(busy) {
+  requestInFlight = busy
+  elements.chatSubmit.disabled = busy; elements.submit.disabled = busy; elements.typing.hidden = !busy
+  elements.chatSubmit.querySelector('span').textContent = busy ? 'Analizando' : 'Enviar'
+  elements.submit.dataset.loading = String(busy)
+  elements.submit.querySelector('.btn-label').textContent = busy ? 'Analizando…' : 'Aplicar configuración'
+  if (busy) scrollChat()
+}
+
+function renderBundleItem(item) {
+  const row = document.createElement('li')
+  if (item.imageUrl) {
+    const image = document.createElement('img')
+    image.className = 'bundle-item-image'; image.src = catalogImageUrl(item); image.alt = ''; image.loading = 'lazy'
+    image.addEventListener('error', () => { image.hidden = true }, { once: true })
+    row.appendChild(image)
   }
+  const description = document.createElement('div')
+  const name = item.productUrl ? document.createElement('a') : document.createElement('span')
+  name.className = 'bundle-item-name'; name.textContent = item.name
+  if (item.productUrl) { name.href = item.productUrl; name.target = '_blank'; name.rel = 'noreferrer' }
+  const meta = document.createElement('span')
+  meta.className = 'bundle-item-meta'
+  const brand = item.brand ? `${item.brand} · ` : ''
+  const availability = item.inStock == null ? 'Disponibilidad no informada por la tienda' : item.inStock ? 'Disponible' : 'Sin stock'
+  meta.textContent = `${brand}${item.seller ? `Vendido por ${item.seller}` : availability}`
+  description.append(name, meta)
+  if (item.orderUrl) {
+    const order = document.createElement('a')
+    order.className = 'bundle-item-order'; order.href = item.orderUrl; order.target = '_blank'; order.rel = 'noreferrer'; order.textContent = 'Hacé tu pedido'
+    description.appendChild(order)
+  }
+  const price = document.createElement('span')
+  price.className = 'bundle-item-price'; price.textContent = priceFormatter.format(item.price)
+  row.append(description, price)
+  return row
+}
+
+function renderPriceAlternative(candidate, targetPrice) {
+  const card = document.createElement('div')
+  card.className = 'price-alternative'
+  const name = candidate.product.productUrl ? document.createElement('a') : document.createElement('strong')
+  name.textContent = candidate.product.name
+  if (candidate.product.productUrl) {
+    name.href = candidate.product.productUrl
+    name.target = '_blank'
+    name.rel = 'noreferrer'
+  }
+  const tradeoff = document.createElement('span')
+  tradeoff.textContent = candidate.exact
+    ? `Coincide exactamente con ${priceFormatter.format(targetPrice)}`
+    : `${priceFormatter.format(candidate.absoluteDifference)} ${candidate.aboveTarget ? 'por encima' : 'por debajo'} · ${candidate.differencePercent}% de diferencia`
+  const price = document.createElement('span')
+  price.className = 'price-alternative__price'
+  price.textContent = priceFormatter.format(candidate.price)
+  card.append(name, tradeoff, price)
+  return card
+}
+
+function renderBundle(data) {
+  hideBundleStates()
+  lastBundleResponse = data
+  conversationId = data.conversationId
+  if (!data.bundle.items.length && !data.commercialResponse) {
+    appendChatMessage('assistant', data.explanation || `Entendí tu pedido, pero no encontré una opción que entre en ${priceFormatter.format(data.request.maxBudget)}. Probá cambiando una preferencia o el presupuesto.`)
+    return
+  }
+  elements.result.hidden = false
+  const targetPrice = data.request.priceIntent?.targetPrice
+  const budgetMax = data.request.priceIntent?.budgetMax
+  elements.result.querySelector('.result-heading h3').textContent = data.commercialResponse && !data.commercialResponse.exactMatch
+    ? 'Encontré estas opciones cercanas'
+    : 'Encontré esta opción para vos'
+  const strategyLabel = STRATEGY_LABELS[data.bundle.strategy] ?? data.bundle.strategy ?? 'Equilibrado'
+  const preferenceText = data.request.preferredTags?.length ? ` Preferencias: ${data.request.preferredTags.join(', ')}.` : ''
+  const priceUnderstanding = targetPrice
+    ? `precio objetivo ${priceFormatter.format(targetPrice)}${budgetMax ? ` y máximo ${priceFormatter.format(budgetMax)}` : ''}`
+    : `hasta ${priceFormatter.format(data.request.maxBudget)}`
+  document.getElementById('understood').textContent = `Entendí: ${CATEGORY_LABELS[data.request.category] ?? data.request.category}, ${priceUnderstanding}.${preferenceText} Estrategia: ${strategyLabel.toLowerCase()}.`
+  document.getElementById('explanation').textContent = data.explanation
+  const strategyNotice = document.getElementById('strategy-notice')
+  strategyNotice.textContent = data.bundle.strategyNotice ?? ''; strategyNotice.hidden = !data.bundle.strategyNotice
+  document.getElementById('engine-badge').textContent = data.intentSource === 'gemini'
+    ? 'intención: Gemini'
+    : 'fallback: reglas'
+  document.getElementById('recommendation-id').textContent = data.recommendationId
+  const details = data.bundle.personalization ?? {}
+  const chips = [
+    ...(details.coveredRequiredProducts ?? []).map((value) => `Incluye: ${value}`),
+    ...(details.satisfiedPreferredTags ?? []).map((value) => `Preferencia: ${value}`),
+    ...(details.complementarityApplied ?? []).map((value) => `Complemento: ${value.replace(' -> ', ' + ')}`),
+  ]
+  document.getElementById('personalization').replaceChildren(...chips.map((text) => { const chip = document.createElement('span'); chip.textContent = text; return chip }))
+  document.getElementById('items').replaceChildren(...data.bundle.items.map(renderBundleItem))
+  const selectedIds = new Set(data.bundle.items.map((item) => item.id))
+  const priceAlternatives = document.getElementById('price-alternatives')
+  const alternativeCandidates = (data.commercialResponse?.alternatives ?? [])
+    .filter((candidate) => !selectedIds.has(candidate.product.id))
+    .slice(0, 3)
+  priceAlternatives.replaceChildren(...alternativeCandidates.map((candidate) => renderPriceAlternative(candidate, targetPrice)))
+  priceAlternatives.hidden = alternativeCandidates.length === 0
+  const commercialActions = document.getElementById('commercial-actions')
+  commercialActions.hidden = !data.commercialResponse
+  const brandButton = commercialActions.querySelector('[data-price-action="maintain-brand"]')
+  if (brandButton) brandButton.textContent = data.conversation.state.brand ? `Mantener ${data.conversation.state.brand}` : 'Mantener preferencias'
+  document.getElementById('subs').replaceChildren(...data.bundle.substitutions.map((substitution) => {
+    const note = document.createElement('p'); note.className = 'sub-note'
+    note.textContent = substitution.replacement ? `Reemplazamos ${substitution.outOfStock.name} por ${substitution.replacement.name} y lo incluimos en la selección.` : `No encontramos reemplazo para ${substitution.requestedTerm ?? substitution.outOfStock.name}.`
+    return note
+  }))
+  const used = data.bundle.totalPrice + data.bundle.leftoverBudget
+  const pricing = data.bundle.pricing ?? { observedSubtotal: data.bundle.totalPrice, ecommercePromotionSavings: 0, smartBundleDemoBenefit: 0, finalTotal: data.bundle.totalPrice, remainingBudget: data.bundle.leftoverBudget }
+  const pricingRows = [
+    ['Subtotal con precios observados', pricing.observedSubtotal, false], ['Ahorro promocional del ecommerce', -pricing.ecommercePromotionSavings, true],
+    ['Beneficio Smart Bundle demo', -pricing.smartBundleDemoBenefit, true], ['Total final', pricing.finalTotal, false],
+  ]
+  document.getElementById('pricing-breakdown').replaceChildren(...pricingRows.flatMap(([label, value, benefit]) => {
+    const term = document.createElement('dt'); term.textContent = label
+    const amount = document.createElement('dd'); amount.textContent = priceFormatter.format(value); if (benefit && value) amount.className = 'benefit'
+    return [term, amount]
+  }))
+  const hasPricedSelection = data.bundle.items.length > 0
+  document.getElementById('pricing-breakdown').hidden = !hasPricedSelection
+  elements.result.querySelector('.budget-track').hidden = !hasPricedSelection
+  elements.result.querySelector('.total-row').hidden = !hasPricedSelection
+  document.getElementById('policy-result').hidden = !hasPricedSelection
+  document.getElementById('budget-fill').style.width = `${used ? Math.min(100, (data.bundle.totalPrice / used) * 100) : 0}%`
+  document.getElementById('total-label').textContent = `Total ${priceFormatter.format(data.bundle.totalPrice)}`
+  document.getElementById('leftover-label').textContent = `Margen ${priceFormatter.format(data.bundle.leftoverBudget)}`
+  const policy = data.bundle.commercialPolicy
+  document.getElementById('policy-result').textContent = policy ? `${policy.label}: ${policy.promotionApplied ? `beneficio válido del ${policy.discountPercent}%` : 'sin beneficio aplicable en esta combinación'}.` : 'Sin política promocional configurada.'
+  elements.accept.hidden = !hasPricedSelection
+  document.getElementById('result-source').textContent = sourceLabel(data.catalog)
+  scrollChat()
+}
+
+async function sendBundle(payload, userLabel) {
+  if (requestInFlight) return
+  archiveCurrentRecommendation()
+  hideBundleStates()
+  if (userLabel) appendChatMessage('user', userLabel)
+  setBusy(true)
+  try {
+    const data = await requestJson(endpoints.bundle, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (data.whatsappHandoff) renderWhatsAppHandoff(data)
+    else renderBundle(data)
+  } catch (error) {
+    appendChatMessage('assistant', `No pude completar la recomendación: ${connectionHelp(error)}`)
+  } finally {
+    setBusy(false); scrollChat()
+  }
+}
+
+if (widgetMode) {
+  document.title = 'Smart Bundle AI · Agente de compra'
+  elements.drawer.hidden = false
+  elements.backdrop.hidden = true
+  elements.drawer.setAttribute('role', 'main')
+  elements.drawer.removeAttribute('aria-modal')
+  elements.close.hidden = true
+} else {
+  elements.searchForm.addEventListener('submit', (event) => { event.preventDefault(); loadProducts(elements.search.value.trim()) })
+}
+elements.launcher.addEventListener('click', openDrawer)
+elements.heroLauncher.addEventListener('click', openDrawer)
+elements.close.addEventListener('click', closeDrawer)
+elements.backdrop.addEventListener('click', closeDrawer)
+document.addEventListener('keydown', (event) => { if (!widgetMode && event.key === 'Escape' && !elements.drawer.hidden) closeDrawer() })
+elements.category.addEventListener('change', () => { selectedCategory = elements.category.value; updateCategoryCopy(selectedCategory) })
+
+elements.chatForm.addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const message = elements.chatInput.value.trim()
+  if (!message) return
+  elements.chatInput.value = ''
+  await sendBundle(conversationalPayload(message), message)
+})
+elements.chatInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); elements.chatForm.requestSubmit() }
+})
+elements.accept.addEventListener('click', async () => {
+  await sendBundle(conversationalPayload('quiero ese'), 'Quiero este')
+})
+document.querySelectorAll('[data-chat-prompt]').forEach((button) => {
+  button.addEventListener('click', () => { elements.chatInput.value = button.dataset.chatPrompt; elements.chatForm.requestSubmit() })
 })
 
-checkHealth()
+elements.form.addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const required = elements.required.value.trim(), preferenceText = elements.preferences.value.trim()
+  const preferences = parsePreferences(preferenceText)
+  const payload = { ...(conversationId ? { conversationId } : {}), category: elements.category.value, maxBudget: Number(elements.budget.value), requiredProducts: required ? [required] : [], freeText: preferenceText || undefined, ...preferences }
+  const description = `Configuración manual: ${required || CATEGORY_LABELS[payload.category] || payload.category}, hasta ${priceFormatter.format(payload.maxBudget)}${preferenceText ? `, ${preferenceText}` : ''}`
+  elements.manual.open = false
+  await sendBundle(payload, description)
+})
+
+document.querySelectorAll('.decision-actions button').forEach((button) => {
+  button.addEventListener('click', async () => {
+    if (button.dataset.composePreference === 'true') {
+      archiveCurrentRecommendation()
+      hideBundleStates()
+      appendChatMessage('assistant', 'Perfecto. Decime qué marca, color, modelo, estilo o uso querés cambiar.')
+      elements.chatInput.placeholder = 'Ej: ahora prefiero Adidas negras'
+      elements.chatInput.focus()
+      return
+    }
+    const label = button.textContent.trim()
+    const payload = actionPayload(button.dataset.strategy, label, button.dataset.alternative === 'true')
+    if (payload) await sendBundle(payload, label)
+  })
+})
+
+document.querySelectorAll('.commercial-actions button').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const brand = lastBundleResponse?.conversation?.state?.brand
+    const message = button.dataset.priceAction === 'maintain-brand'
+      ? `Mantené ${brand || 'las preferencias'} y dame otra opción cercana a ese precio`
+      : button.dataset.priceAction === 'maintain-price'
+        ? 'Otra marca, mantené ese precio'
+        : 'Dame otra opción cercana a ese precio'
+    await sendBundle(conversationalPayload(message), button.textContent.trim())
+  })
+})
+
+initialize()

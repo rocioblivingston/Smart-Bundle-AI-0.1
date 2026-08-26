@@ -97,8 +97,9 @@ describe('normalizeVtexProducts', () => {
   it('permite armar un combo real respetando presupuesto aun con centavos', () => {
     const products = normalizeVtexProducts(vtexResponse, 'limpieza')
     const bundle = composeBundle(products, 'limpieza', 5000, ['detergente'])
-    expect(bundle.items).toHaveLength(2)
-    expect(bundle.totalPrice).toBe(4300.15)
+    expect(bundle.items).toHaveLength(1)
+    expect(bundle.totalPrice).toBe(2499.9)
+    expect(new Set(bundle.items.map((product) => product.decisionSignals?.needIds[0] ?? 'laundry-main')).size).toBe(1)
     expect(bundle.totalPrice).toBeLessThanOrEqual(5000)
   })
 })
@@ -121,6 +122,29 @@ describe('VtexCatalogAdapter', () => {
     expect(result.source).toBe('vtex')
     expect(result.searchTerm).toBe('detergente')
     expect(result.products[0].source).toBe('vtex')
+  })
+
+  it('agrega consultas complementarias y deduplica los SKU recibidos', async () => {
+    const requestedUrls: string[] = []
+    const fetchFn: typeof fetch = async (input) => {
+      requestedUrls.push(String(input))
+      return new Response(JSON.stringify(vtexResponse), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    const adapter = new VtexCatalogAdapter(new LocalCatalogAdapter(localCatalog), { fetchFn })
+    const result = await adapter.getCatalog({
+      category: 'limpieza',
+      preferences: ['detergente'],
+      requiredProducts: ['detergente'],
+      searchTerms: ['detergente', 'esponja', 'guantes'],
+    })
+
+    expect(requestedUrls).toHaveLength(3)
+    expect(requestedUrls.some((url) => url.includes('/esponja'))).toBe(true)
+    expect(result.products).toHaveLength(2)
+    expect(result.searchTerm).toBe('detergente, esponja, guantes')
   })
 
   it('usa catalog.json como fallback si VTEX no responde', async () => {

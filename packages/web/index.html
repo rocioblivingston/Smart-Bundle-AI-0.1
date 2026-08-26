@@ -1,130 +1,156 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smart Bundle AI</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Demo ecommerce con asistente Smart Bundle AI embebido">
+  <title>Nexo Mercado · Smart Bundle AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css?v=widget-stage-1">
 </head>
 <body>
-  <div class="page">
+  <header class="store-header">
+    <a class="store-brand" href="#" aria-label="Nexo Mercado, inicio">
+      <span class="store-brand__mark">N</span>
+      <span>Nexo <strong>Mercado</strong></span>
+    </a>
+    <form id="search-form" class="search" role="search">
+      <label class="visually-hidden" for="store-search">Buscar productos</label>
+      <input id="store-search" type="search" placeholder="Buscar en el catálogo" autocomplete="off">
+      <button type="submit">Buscar</button>
+    </form>
+    <button class="cart-button" type="button" aria-label="Carrito de demostración, vacío" title="El carrito se implementará en una próxima etapa">
+      <span aria-hidden="true">🛒</span><span>Carrito</span><b>0</b>
+    </button>
+  </header>
 
-    <header class="site-header">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">🛒</span>
-        <span class="brand-name">Smart Bundle <em>AI</em></span>
+  <nav class="category-nav" aria-label="Categorías"><div id="category-nav" class="category-nav__inner"></div></nav>
+
+  <main>
+    <section class="commerce-hero">
+      <div>
+        <p class="eyebrow">Compra más simple</p>
+        <h1>Todo lo que necesitás,<br><span>mejor combinado.</span></h1>
+        <p>Explorá el catálogo o pedile al asistente que arme una selección personalizada sin superar tu presupuesto.</p>
+        <button id="hero-agent-button" class="primary-action" type="button">✨ Hablar con mi agente de compra</button>
       </div>
-      <p id="status" class="status-pill status-pill--loading">conectando con la API…</p>
-    </header>
+      <div class="hero-card" aria-hidden="true">
+        <span>Smart Bundle</span><strong>Tu compra,<br>con sentido.</strong><small id="hero-signal">Presupuesto + preferencias + stock real</small>
+      </div>
+    </section>
 
-    <main>
-      <section class="hero">
-        <p class="eyebrow">Prototipo · basado en la idea de Gaby</p>
-        <h1>Decile qué necesitás.<br>Te armamos el combo que más aprovecha tu plata.</h1>
-        <p class="hero-sub">
-          Elegí una categoría y cuánto tenés para gastar. El sistema arma la combinación que
-          más usa tu presupuesto sin pasarse ni un peso — y si algo no tiene stock, lo cambia
-          por un equivalente real.
-        </p>
+    <section class="catalog-section" aria-labelledby="catalog-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">Catálogo</p><h2 id="catalog-title">Productos destacados</h2></div>
+        <span id="source-badge" class="source-badge source-badge--loading">Conectando con el catálogo…</span>
+      </div>
+      <p id="catalog-message" class="catalog-message" aria-live="polite"></p>
+      <div id="product-grid" class="product-grid" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer class="store-footer">
+    <span>Nexo Mercado es una interfaz ficticia creada para demostrar Smart Bundle AI.</span>
+    <span>No representa ni está asociada oficialmente a ningún retailer.</span>
+  </footer>
+
+  <button id="agent-launcher" class="agent-launcher" type="button" aria-label="Abrir Smart Bundle AI" aria-haspopup="dialog" aria-controls="agent-drawer">
+    <span aria-hidden="true">✨</span><span>Hablar con mi agente</span>
+  </button>
+  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+  <aside id="agent-drawer" class="agent-drawer" role="dialog" aria-modal="true" aria-labelledby="agent-title" hidden>
+    <div class="drawer-head">
+      <div><p class="eyebrow">Smart Bundle AI</p><h2 id="agent-title">Tu agente de compra</h2></div>
+      <button id="drawer-close" class="icon-button" type="button" aria-label="Cerrar asistente">×</button>
+    </div>
+    <p id="drawer-intro" class="drawer-intro">Decime qué necesitás y cuánto querés gastar. Yo interpreto tu pedido y reoptimizo cada respuesta.</p>
+
+    <section id="chat-thread" class="chat-thread" role="log" aria-live="polite" aria-label="Conversación con el agente de compra">
+      <article class="chat-message chat-message--assistant chat-welcome">
+        <span class="chat-avatar" aria-hidden="true">AI</span>
+        <div class="chat-bubble">
+          <strong>¡Hola! Soy tu agente de compra.</strong>
+          <p>Contame qué buscás, tus preferencias y tu presupuesto. No hace falta completar filtros.</p>
+          <div class="prompt-suggestions" aria-label="Ejemplos de consulta">
+            <button type="button" data-chat-prompt="Tengo hasta $80.000 y quiero unas Nike claras para uso diario">Nike claras hasta $80.000</button>
+            <button type="button" data-chat-prompt="Busco unas Adidas negras y tengo $75.000">Adidas negras hasta $75.000</button>
+          </div>
+        </div>
+      </article>
+
+      <div id="typing-indicator" class="chat-message chat-message--assistant" hidden>
+        <span class="chat-avatar" aria-hidden="true">AI</span>
+        <div class="chat-bubble chat-typing" aria-label="El agente está analizando"><span></span><span></span><span></span></div>
+      </div>
+
+      <section id="result" class="bundle-result chat-message chat-message--assistant" hidden aria-live="polite">
+        <span class="chat-avatar" aria-hidden="true">AI</span>
+        <div class="chat-bubble chat-bubble--result">
+          <div class="result-heading">
+            <h3>Encontré esta opción para vos</h3>
+            <div class="result-identifiers"><span id="engine-badge"></span><span id="recommendation-id"></span></div>
+          </div>
+          <p id="understood" class="understood"></p>
+          <p id="explanation" class="explanation"></p>
+          <p id="strategy-notice" class="strategy-notice" hidden></p>
+          <div id="personalization" class="personalization"></div>
+          <ul id="items" class="bundle-items"></ul>
+          <div id="price-alternatives" class="price-alternatives" hidden></div>
+          <div id="subs"></div>
+          <dl id="pricing-breakdown" class="pricing-breakdown"></dl>
+          <div class="budget-track"><span id="budget-fill"></span></div>
+          <div class="total-row"><strong id="total-label"></strong><span id="leftover-label"></span></div>
+          <p id="policy-result" class="policy-result"></p>
+          <button id="accept-recommendation" class="accept-recommendation" type="button">Quiero este</button>
+          <div class="decision-actions" aria-label="Reoptimizar recomendación">
+            <button type="button" data-strategy="lowest-cost">Más económico</button>
+            <button type="button" data-strategy="balanced" data-alternative="true">Otra alternativa</button>
+            <button type="button" data-strategy="quality-first">Priorizar calidad</button>
+            <button type="button" data-strategy="maximize-budget">Aprovechar presupuesto</button>
+            <button type="button" data-strategy="balanced">Equilibrado</button>
+            <button type="button" data-compose-preference="true">Cambiar marca o preferencia</button>
+          </div>
+          <div id="commercial-actions" class="commercial-actions" hidden aria-label="Resolver diferencia de precio">
+            <button type="button" data-price-action="maintain-brand">Mantener marca</button>
+            <button type="button" data-price-action="maintain-price">Mantener precio</button>
+            <button type="button" data-price-action="alternative">Ver otra opción</button>
+          </div>
+          <p id="result-source" class="result-source"></p>
+        </div>
       </section>
+      <section id="empty-result" class="state-card chat-state" hidden aria-live="polite"></section>
+      <section id="error" class="state-card state-card--error chat-state" hidden role="alert"></section>
+    </section>
 
-      <section class="builder" aria-labelledby="builder-heading">
-        <h2 id="builder-heading" class="visually-hidden">Armar combo</h2>
+    <form id="chat-form" class="chat-composer">
+      <label class="visually-hidden" for="chat-input">Escribí qué querés comprar</label>
+      <textarea id="chat-input" rows="2" placeholder="Ej: Tengo hasta $80.000 y quiero unas Nike claras para uso diario" autocomplete="off" required></textarea>
+      <button id="chat-submit" type="submit" aria-label="Enviar consulta"><span>Enviar</span><b aria-hidden="true">↑</b></button>
+    </form>
+    <p class="chat-hint">Podés repreguntar: “ahora negras”, “cambiá a Adidas” o usar las acciones rápidas.</p>
 
+    <details id="manual-config" class="manual-panel">
+      <summary>Prefiero configurar manualmente</summary>
+      <div class="manual-panel__content">
         <form id="bundle-form">
-          <fieldset class="field-group">
-            <legend>1. ¿Qué categoría?</legend>
-            <div id="category-chips" class="chip-row" role="radiogroup" aria-label="Categoría">
-              <p class="chip-placeholder">cargando categorías…</p>
-            </div>
-          </fieldset>
-
-          <fieldset class="field-group">
-            <legend>2. ¿Cuánto tenés para gastar?</legend>
-            <div class="budget-control">
-              <input type="range" id="budget-slider" min="500" max="15000" step="100" value="4000">
-              <div class="budget-value">
-                <span class="budget-currency">$</span>
-                <input type="number" id="budget-number" min="0" step="100" value="4000" aria-label="Presupuesto en pesos argentinos">
-                <span class="budget-currency-code">ARS</span>
-              </div>
-            </div>
-            <p class="field-hint">Precios y presupuesto en pesos argentinos.</p>
-          </fieldset>
-
-          <fieldset class="field-group">
-            <legend>3. ¿Buscás algo puntual? <span class="optional">(opcional)</span></legend>
-            <input type="text" id="preference" placeholder="Ej: detergente, mouse, shampoo…">
-          </fieldset>
-
-          <details class="free-text-toggle">
-            <summary>O contanoslo con tus propias palabras →</summary>
-            <fieldset class="field-group field-group--nested">
-              <label for="freeText" class="free-text-label">
-                Esto reemplaza la categoría y el presupuesto de arriba. Lo interpreta la IA
-                (o las reglas, si no hay motor de IA disponible).
-              </label>
-              <textarea id="freeText" rows="2" placeholder="Ej: necesito productos de limpieza, tengo $4000, ojalá haya detergente"></textarea>
-            </fieldset>
-          </details>
-
-          <button type="submit" id="submit-btn">
-            <span class="btn-label">Armar combo</span>
-            <span class="btn-spinner" aria-hidden="true"></span>
-          </button>
+          <label for="bundle-category">Categoría</label>
+          <select id="bundle-category" required></select>
+          <label for="budget-number">Presupuesto máximo</label>
+          <div class="money-input"><span>$</span><input id="budget-number" type="number" min="100" step="100" value="5000" required><small>ARS</small></div>
+          <label for="required-product">Producto que necesitás <span>(opcional)</span></label>
+          <input id="required-product" type="text" placeholder="Ej: detergente">
+          <label for="preferences">Preferencias <span>(opcional)</span></label>
+          <input id="preferences" type="text" placeholder="Ej: económico, sin perfume, no lavandina">
+          <p id="form-hint" class="form-hint">Podés escribir “económico”, “sin perfume” o “no lavandina”.</p>
+          <button id="submit-btn" class="primary-action primary-action--full" type="submit"><span class="btn-label">Aplicar configuración</span><span class="spinner" aria-hidden="true"></span></button>
         </form>
-      </section>
+      </div>
+    </details>
+  </aside>
 
-      <section id="result" class="receipt" hidden aria-live="polite">
-        <div class="receipt-head">
-          <span class="receipt-title">Tu combo</span>
-          <div class="receipt-badges">
-            <span id="catalog-badge" class="catalog-badge"></span>
-            <span id="engine-badge" class="engine-badge"></span>
-          </div>
-        </div>
-
-        <p id="explanation" class="explanation"></p>
-
-        <ul id="items" class="item-list"></ul>
-
-        <div id="subs" class="subs"></div>
-
-        <div class="budget-bar-wrap">
-          <div class="budget-bar-track">
-            <div id="budget-bar-fill" class="budget-bar-fill"></div>
-          </div>
-          <div class="budget-bar-labels">
-            <span id="total-label"></span>
-            <span id="leftover-label" class="leftover"></span>
-          </div>
-        </div>
-      </section>
-
-      <section id="empty-result" class="receipt receipt--empty" hidden aria-live="polite">
-        <p id="empty-message"></p>
-      </section>
-
-      <section id="error" class="error-box" hidden role="alert"></section>
-
-      <section class="honesty-note">
-        <h3>Qué es real acá</h3>
-        <ul>
-          <li><strong>El cálculo del combo es real</strong>: programación dinámica exacta, no una IA adivinando.</li>
-          <li><strong>El catálogo principal viene de Carrefour/VTEX</strong>: si el servicio no responde, la demo vuelve al catálogo local sin interrumpirse.</li>
-          <li><strong>La redacción puede ser IA real (Claude)</strong> o reglas fijas si no hay API key — el resultado nunca inventa productos o precios.</li>
-        </ul>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <p>Smart Bundle AI — prototipo educativo, Semillero Digital</p>
-    </footer>
-  </div>
-
-  <script src="app.js"></script>
+  <script src="/config.js"></script>
+  <script src="/app.js?v=widget-stage-1"></script>
 </body>
 </html>

@@ -9,36 +9,32 @@ README y en el commit `fix(core): substitute must match product type...` — le�
 el razonamiento). El núcleo del producto (`packages/core`) está construido, testeado y
 funcionando.
 
-**Lo que falta es tuyo: ponerlo online para que cualquiera lo pueda usar sin tener tu
-computadora prendida.** Y ese paso, a propósito, no te lo resolví yo. Es la parte que más
-se parece a un trabajo real, y es la que más se aprende haciéndola.
+**El código ya está preparado para ponerlo online sin tener tu computadora prendida.** Falta crear
+los dos servicios en tus cuentas de Render y Vercel y cargar sus variables de entorno.
 
 ## Por qué no está ya deployado
 
-Ahora mismo el front (`packages/web`) le habla a la API en `http://localhost:3001` —
-literal, tu propia máquina. Andá a `packages/web/app.js` y vas a ver la constante
-`ENDPOINT`. Mientras diga `localhost`, solo vos podés usar el combo, desde tu compu, con
-todo corriendo a la vez.
+El frontend ya no tiene una API de producción fija. En local usa `http://localhost:3001` solo cuando
+se sirve por separado; en Vercel el build genera `config.js` a partir de `VITE_API_URL`.
 
 ## Lo que tenés que resolver (en este orden)
 
-1. **Que la URL de la API no esté fija en el código.** Buscá cómo un sitio estático sabe a
-   qué API pegarle según el entorno donde corre (local vs. producción) sin tener que tocar
-   el código cada vez. No hay una sola forma correcta — investigá "runtime config static
-   site" o mirá cómo lo resuelven ejemplos de proyectos chicos en Vercel o Netlify.
+1. **Crear la API en Render desde la raíz del repositorio.** Build:
+   `npm ci && npm run build:api`; start: `npm start --workspace=@sba/api`; healthcheck: `/health`.
 
-2. **Deployar la API en algún lado.** `packages/api` es un servidor Express normal.
-   Necesita vivir en un servicio que corra Node de forma continua o bajo demanda —
-   Vercel, Render y Railway son las opciones más simples y tienen plan gratuito. Cada uno
-   tiene su forma de configurar "de dónde arranca" en un monorepo (buscá "root directory"
-   en la doc del que elijas).
+2. **Cargar las variables de Render.** `ECOMMERCE_PROVIDER=lenaldi`, `GEMINI_API_KEY`,
+   `LENALDI_WHATSAPP_NUMBER`, `LENALDI_CACHE_TTL_SECONDS=900`. `FRONTEND_ORIGIN` se completa
+   después de crear Vercel.
 
-3. **La `ANTHROPIC_API_KEY` es opcional, y así debería seguir.** Si no la configurás en el
+3. **La `GEMINI_API_KEY` es opcional para que la aplicación no se caiga.** Si no la configurás en el
    servicio de deploy, el sistema sigue funcionando con las reglas fijas (`StubIntentParser`,
-   `StubExplainer`) — no le pidas la key a nadie de Semillero, no hace falta para demostrar
-   que el prototipo funciona.
+   `StubExplainer`), pero para demostrar Gemini real sí hay que cargarla en Render.
 
-4. **Después, deployar el front** apuntando a la URL real de la API que te dio el paso 2.
+4. **Crear el frontend en Vercel desde la raíz del repositorio.** Build: `npm run build:web`;
+   output: `dist/web`; variable: `VITE_API_URL=https://TU-API.onrender.com`.
+
+5. **Volver a Render** y configurar `FRONTEND_ORIGIN=https://TU-FRONT.vercel.app`. La URL de Vercel,
+   no la de Render, es la que se coloca en Lenaldi.
 
 ## Una trampa real que ya encontramos por vos
 

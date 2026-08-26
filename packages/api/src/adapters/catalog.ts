@@ -1,11 +1,13 @@
 import { categoriesOf, type Product } from '@sba/core'
 
-export type CatalogProviderName = 'local' | 'vtex'
-export type CatalogSource = 'local' | 'local-fallback' | 'vtex'
+export type CatalogProviderName = 'local' | 'vtex' | 'lenaldi'
+export type CatalogSource = 'local' | 'local-fallback' | 'vtex' | 'lenaldi'
 
 export interface CatalogRequest {
   category: string
   preferences: string[]
+  requiredProducts?: string[]
+  searchTerms?: string[]
 }
 
 export interface CatalogResult {
@@ -15,6 +17,7 @@ export interface CatalogResult {
   label: string
   searchTerm?: string
   fallbackReason?: string
+  cacheHit?: boolean
 }
 
 export interface CatalogAdapter {

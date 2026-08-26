@@ -2,23 +2,16 @@
   "name": "smart-bundle-ai",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "packages/*"
-  ],
-  "engines": {
-    "node": ">=22"
-  },
+  "workspaces": ["packages/*"],
+  "engines": { "node": ">=22" },
   "scripts": {
     "test": "npm run test --workspace=@sba/core",
+    "test:all": "npm run test --workspace=@sba/core && npm run test --workspace=@sba/api",
     "build:core": "npm run build --workspace=@sba/core",
     "build:api": "npm run build:core && npm run build --workspace=@sba/api",
-    "dev": "npx tsx watch src/server.ts",
+    "build:web": "node scripts/build-web.mjs",
+    "build": "npm run build:api && npm run build:web",
+    "dev:api": "npm run build:core && npm run dev --workspace=@sba/api",
     "dev:web": "npx --yes serve packages/web -l 5500"
-  },
-  "dependencies": {
-    "cors": "^2.8.6"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.19"
   }
 }

@@ -20,7 +20,7 @@ export function findSubstitute(
 
   const candidates = catalog.filter(
     (p) =>
-      p.inStock &&
+      p.inStock !== false &&
       p.category === outOfStock.category &&
       !excludedIds.has(p.id) &&
       p.tags.some((t) => targetTags.has(t)),
@@ -28,9 +28,8 @@ export function findSubstitute(
 
   if (candidates.length === 0) return null
 
-  return candidates.reduce((closest, current) =>
-    Math.abs(current.price - outOfStock.price) < Math.abs(closest.price - outOfStock.price)
-      ? current
-      : closest,
-  )
+  return [...candidates].sort((left, right) =>
+    Math.abs(left.price - outOfStock.price) - Math.abs(right.price - outOfStock.price) ||
+    left.id.localeCompare(right.id),
+  )[0]
 }

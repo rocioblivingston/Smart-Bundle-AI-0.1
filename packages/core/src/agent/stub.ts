@@ -4,39 +4,138 @@ import type { Explainer, IntentParser } from './contracts.js'
 const normalize = (text: string): string =>
   text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 
-/**
- * Extractor determinístico por reglas: keyword matching de categoría +
- * regex de montos en pesos. Cubre el caso feliz sin costo ni latencia de IA,
- * y es lo que corre cuando falta ANTHROPIC_API_KEY o Claude falla.
- */
+const FOOTWEAR_BRANDS = ['adidas', 'new balance', 'nike', 'puma', 'vans']
+const FOOTWEAR_COLORS = [
+  'claro', 'clara', 'claras', 'blanco', 'blanca', 'blancas', 'white', 'crema', 'nude',
+  'negro', 'negra', 'negras', 'black', 'gris', 'grises', 'rosa', 'lila', 'celeste',
+  'azul', 'verde', 'bordo', 'marron', 'caramelo', 'chocolate',
+]
+const FOOTWEAR_STYLES = ['casual', 'urbano', 'urbana', 'deportivo', 'deportiva', 'running', 'retro', 'clasico', 'clasica', 'skate']
+const unique = (values: string[]): string[] => [...new Set(values.map((value) => value.trim()).filter(Boolean))]
+
+function parseLocalizedAmount(value: string): number | null {
+  const compact = value.replace(/\s/g, '')
+  const normalized = compact.includes(',')
+    ? compact.replace(/\./g, '').replace(',', '.')
+    : compact.replace(/\./g, '')
+  const amount = Number(normalized)
+  return Number.isFinite(amount) && amount > 0 ? amount : null
+}
+
+function extractBudget(text: string): number | null {
+  const amount = String.raw`(\d[\d.\s]*(?:,\d{1,2})?)`
+  const patterns = [
+    new RegExp(String.raw`\$\s*${amount}`),
+    new RegExp(String.raw`\b(?:presupuesto(?:\s+(?:de|es))?|hasta|puedo\s+gastar|quiero\s+gastar|gastar)\D{0,20}${amount}\s*(?:pesos)?\b`),
+    new RegExp(String.raw`\b${amount}\s*pesos\b`),
+  ]
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    const parsed = match?.[1] ? parseLocalizedAmount(match[1]) : null
+    if (parsed != null) return parsed
+  }
+  return null
+}
+
+const cleanPhrase = (value: string): string => value
+  .replace(/\b(con|para|y|pero|que|tengo|hasta|presupuesto).*$/i, '')
+  .replace(/[.,;:!?]/g, ' ')
+  .trim()
+
+function captures(text: string, patterns: RegExp[]): string[] {
+  const values = patterns.flatMap((pattern) =>
+    [...text.matchAll(pattern)].map((match) => cleanPhrase(match[1] ?? '')),
+  )
+  return [...new Set(values.filter(Boolean))]
+}
+
+/** Extractor deterministico usado cuando el proveedor de IA no esta disponible. */
 export class StubIntentParser implements IntentParser {
   async parse(freeText: string, availableCategories: string[]): Promise<ParsedIntent> {
     const text = normalize(freeText)
+    const explicitCategory = availableCategories.find((candidate) => text.includes(normalize(candidate))) ?? null
+    const footwearCategory = availableCategories.find((candidate) => normalize(candidate) === 'zapatillas')
+    const mentionsFootwear = /\b(zapatillas?|sneakers?|calzado|adidas|new balance|nike|puma|vans)\b/.test(text)
+    const category = explicitCategory ?? (footwearCategory && mentionsFootwear ? footwearCategory : null)
+    // Los números sin contexto pueden ser talles, cantidades o modelos. Solo
+    // tratamos como presupuesto importes marcados con $, "pesos" o una frase
+    // comercial explícita para no confundir, por ejemplo, "talle 38" con $38.
+    const maxBudget = extractBudget(text)
 
-    const category = availableCategories.find((c) => text.includes(normalize(c))) ?? null
+    const excludedTags = captures(text, [/(?:sin|evitar que tenga)\s+([a-z][a-z0-9 -]{1,30})/g])
+    const avoidedProducts = captures(text, [
+      /(?:no quiero|evita|sin incluir)\s+(?:un |una |el |la )?([a-z][a-z0-9 -]{1,40})/g,
+    ])
+    let preferredTags = captures(text, [
+      /(?:prefiero|preferentemente|mejor si es|algo)\s+([a-z][a-z0-9 -]{1,30})/g,
+    ])
+    let requiredProducts = captures(text, [
+      /(?:necesito|(?<!no )quiero)\s+(?:si o si\s+)?(?:un |una |el |la )?([a-z][a-z0-9 -]{1,40})/g,
+      /(?:que incluya|con)\s+(?:un |una |el |la )?([a-z][a-z0-9 -]{1,40})/g,
+    ]).filter((value) =>
+      !availableCategories.some((available) => normalize(available) === value) &&
+      !/^(productos?|algo)\b/.test(value) &&
+      !value.includes(' sin ') &&
+      !avoidedProducts.includes(value),
+    )
+    if (category && normalize(category) === 'zapatillas') {
+      const brandPreferences = FOOTWEAR_BRANDS.filter((brand) => text.includes(brand))
+      const colorPreferences = FOOTWEAR_COLORS.filter((color) => new RegExp(`\\b${color}\\b`).test(text))
+      const stylePreferences = FOOTWEAR_STYLES.filter((style) => new RegExp(`\\b${style}\\b`).test(text))
+      const usePreferences = captures(text, [
+        /para\s+(uso\s+[a-z ]{2,24})(?:\s+y\s+tengo|,|\.|$)/g,
+        /para\s+([a-z ]{2,24})(?:\s+y\s+tengo|,|\.|$)/g,
+      ])
+      requiredProducts = ['zapatillas']
+      preferredTags = unique([...preferredTags, ...brandPreferences, ...colorPreferences, ...stylePreferences, ...usePreferences])
+    }
+    const strategy = /(?:priorizar|priorizo|prefiero)\s+(?:la\s+)?calidad|mayor calidad/.test(text)
+      ? 'quality-first'
+      : /aprovechar(?: al maximo)?|usar todo|gastar todo/.test(text)
+        ? 'maximize-budget'
+        : /gastar lo menos|menor costo|mas barato|economico/.test(text)
+          ? 'lowest-cost'
+          : null
 
-    // $5000, $10.000, "3500 pesos" — el punto de miles se descarta antes del regex.
-    const withoutThousands = text.replace(/(\d)\.(\d{3})/g, '$1$2')
-    const match = withoutThousands.match(/\$?\s*(\d{2,7})\s*(pesos)?/)
-    const maxBudget = match ? Number(match[1]) : null
-
-    return { category, maxBudget, preferences: [] }
+    return {
+      category,
+      maxBudget,
+      preferences: requiredProducts,
+      requiredProducts,
+      preferredTags,
+      excludedTags,
+      avoidedProducts,
+      strategy,
+    }
   }
 }
 
-/** Redactor determinístico por plantilla: nunca inventa nada porque solo repite `bundle`. */
+/** Redactor por plantilla: solo utiliza datos calculados por el nucleo. */
 export class StubExplainer implements Explainer {
   async explain(bundle: Bundle, request: BundleRequest): Promise<string> {
     if (bundle.items.length === 0) {
-      return `No encontré productos de ${request.category} que entren en $${request.maxBudget}. Probá con más presupuesto.`
+      return `No encontre productos de ${request.category} que entren en $${request.maxBudget}. Proba con mas presupuesto.`
     }
 
-    const lines = bundle.items.map((i) => `${i.name} ($${i.price})`).join(', ')
-    const subLines = bundle.substitutions
-      .filter((s) => s.replacement)
-      .map((s) => `Como no había ${s.outOfStock.name}, sumamos ${s.replacement!.name}.`)
+    const lines = bundle.items.map((item) => `${item.name} ($${item.price})`).join(', ')
+    const substitutions = bundle.substitutions
+      .filter((substitution) => substitution.replacement)
+      .map((substitution) => substitution.reason === 'over-budget'
+        ? `Como ${substitution.outOfStock.name} excedia el presupuesto, sumamos ${substitution.replacement!.name}.`
+        : `Como ${substitution.outOfStock.name} no tenia stock, sumamos ${substitution.replacement!.name}.`)
       .join(' ')
+    const complements = bundle.personalization?.complementarityApplied.length
+      ? ` Sumamos ${bundle.personalization.complementarityApplied.length} complemento(s) util(es).`
+      : ''
+    const uncovered = bundle.personalization?.uncoveredRequiredProducts.length
+      ? ` No encontramos dentro del presupuesto: ${bundle.personalization.uncoveredRequiredProducts.join(', ')}.`
+      : ''
+    const promotion = bundle.pricing?.smartBundleDemoBenefit
+      ? ` La politica demo aplico un beneficio de $${bundle.pricing.smartBundleDemoBenefit}.`
+      : ''
+    const strategy = bundle.strategy ? ` Estrategia: ${bundle.strategy}.` : ''
 
-    return `Armamos tu combo de ${request.category}: ${lines}. Total: $${bundle.totalPrice}, te quedan $${bundle.leftoverBudget} de margen. ${subLines}`.trim()
+    return `Armamos tu combo de ${request.category}: ${lines}. Total final: $${bundle.totalPrice}, te quedan $${bundle.leftoverBudget} de margen.${strategy}${complements}${promotion}${uncovered} ${substitutions}`.trim()
   }
 }

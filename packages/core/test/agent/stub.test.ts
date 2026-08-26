@@ -40,7 +40,66 @@ describe('StubIntentParser', () => {
 
   it('nunca lanza con texto vacío', async () => {
     const intent = await parser.parse('', categories)
-    expect(intent).toEqual({ category: null, maxBudget: null, preferences: [] })
+    expect(intent).toEqual({
+      category: null,
+      maxBudget: null,
+      preferences: [],
+      requiredProducts: [],
+      preferredTags: [],
+      excludedTags: [],
+      avoidedProducts: [],
+      strategy: null,
+    })
+  })
+
+  it('separa requeridos, preferencias y exclusiones', async () => {
+    const intent = await parser.parse(
+      'Necesito si o si detergente, prefiero economico, sin perfume y no quiero lavandina',
+      categories,
+    )
+    expect(intent.requiredProducts).toContain('detergente')
+    expect(intent.preferredTags).toContain('economico')
+    expect(intent.excludedTags).toContain('perfume')
+    expect(intent.avoidedProducts).toContain('lavandina')
+    expect(intent.requiredProducts).not.toContain('lavandina')
+  })
+
+  it('entiende las frases naturales de exclusion sin crear un requerido falso', async () => {
+    const intent = await parser.parse('Quiero productos sin perfume y no quiero lavandina', categories)
+    expect(intent.excludedTags).toContain('perfume')
+    expect(intent.avoidedProducts).toContain('lavandina')
+    expect(intent.requiredProducts).toEqual([])
+  })
+
+  it('detecta estrategias de compra explicitas', async () => {
+    await expect(parser.parse('quiero priorizar calidad', categories)).resolves.toMatchObject({ strategy: 'quality-first' })
+    await expect(parser.parse('quiero gastar lo menos posible', categories)).resolves.toMatchObject({ strategy: 'lowest-cost' })
+    await expect(parser.parse('quiero aprovechar al maximo', categories)).resolves.toMatchObject({ strategy: 'maximize-budget' })
+  })
+
+  it('interpreta marca, color, uso y presupuesto para zapatillas', async () => {
+    const intent = await parser.parse(
+      'Quiero unas Nike claras para uso diario y tengo hasta $75.000.',
+      [...categories, 'zapatillas'],
+    )
+    expect(intent.category).toBe('zapatillas')
+    expect(intent.maxBudget).toBe(75000)
+    expect(intent.requiredProducts).toEqual(['zapatillas'])
+    expect(intent.preferredTags).toEqual(expect.arrayContaining(['nike', 'claras', 'uso diario']))
+  })
+
+  it('no confunde el talle con el presupuesto de una búsqueda de zapatillas', async () => {
+    const intent = await parser.parse(
+      'Busco unas Nike negras, talle 38, con presupuesto de $100.000',
+      [...categories, 'zapatillas'],
+    )
+    expect(intent.maxBudget).toBe(100000)
+    expect(intent.preferredTags).toEqual(expect.arrayContaining(['nike', 'negras']))
+  })
+
+  it('no inventa un presupuesto cuando el único número es el talle', async () => {
+    const intent = await parser.parse('Busco Nike negras talle 38', [...categories, 'zapatillas'])
+    expect(intent.maxBudget).toBeNull()
   })
 })
 
