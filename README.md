@@ -44,14 +44,17 @@ npm install
 npm run build
 ```
 
-Después, dos terminales:
+Para probar la aplicación completa desde un único origen:
 
 ```bash
 npm run dev:api    # API en :3001
-npm run dev:web    # web en :5500 (o abrí packages/web/index.html con Live Server)
 ```
 
-Abrí `http://localhost:5500`.
+Abrí `http://localhost:3001`. El backend sirve también la landing, por lo que no necesita CORS.
+
+Si querés servir el frontend separado con `npm run dev:web`, indicá la API mediante el parámetro
+de desarrollo `?api=http://localhost:3001`. En producción ese parámetro no es necesario:
+`VITE_API_URL` se incorpora durante el build de Vercel.
 
 ## Variables de entorno
 
