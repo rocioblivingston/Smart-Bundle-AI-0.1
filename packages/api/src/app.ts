@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express, { type Express } from 'express'
 import { composeBundle, type Product } from '@sba/core'
 import { buildAgents } from './adapters/claude.js'
@@ -26,7 +27,8 @@ export function buildApp(catalogOrAdapter: Product[] | CatalogAdapter, apiKey: s
   const agents = buildAgents(apiKey)
   const categories = catalogAdapter.categories()
 
-  const app = express()
+  const app = express() 
+  app.use(cors({ origin: '*' }));
   app.use(express.json())
 
   // CORS abierto: es un prototipo, la web y la API son orígenes distintos
