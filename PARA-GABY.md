@@ -33,7 +33,7 @@ todo corriendo a la vez.
    tiene su forma de configurar "de dónde arranca" en un monorepo (buscá "root directory"
    en la doc del que elijas).
 
-3. **La `ANTHROPIC_API_KEY` es opcional, y así debería seguir.** Si no la configurás en el
+3. **La `GEMINI_API_KEY` es opcional, y así debería seguir.** Si no la configurás en el
    servicio de deploy, el sistema sigue funcionando con las reglas fijas (`StubIntentParser`,
    `StubExplainer`) — no le pidas la key a nadie de Semillero, no hace falta para demostrar
    que el prototipo funciona.

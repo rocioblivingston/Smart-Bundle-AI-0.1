@@ -8,8 +8,8 @@ sin pasarse ni un peso, y si algo no tiene stock lo reemplaza por un producto eq
 
 ```
 packages/
-├─ core/    lógica de negocio pura — sin Express, sin n8n, sin SDK de Claude
-├─ api/     servidor HTTP, adaptador Carrefour/VTEX y fallback local
+├─ core/    lógica de negocio pura — sin Express, sin n8n, sin SDK de proveedor
+├─ api/     servidor HTTP, adaptadores Carrefour/VTEX y Lenaldi, y fallback local
 └─ web/     página estática (HTML/CSS/JS sin build) que llama a la API
 n8n/         workflow importable: Webhook → HTTP Request → Respond
 ```
@@ -26,7 +26,7 @@ maximizar cuánto del presupuesto se usa sin pasarse. Se resuelve con programaci
 y determinística — mismo catálogo y mismo presupuesto dan siempre el mismo resultado. Pedirle esto
 a un LLM sería arriesgar la única promesa que no puede fallar (no pasarse del presupuesto) a cambio
 de nada: no hay ambigüedad que resolver, es matemática pura. La IA entra donde sí hace falta:
-entender el pedido en lenguaje natural y redactar la explicación — nunca calculando el total.
+ entender el pedido en lenguaje natural — nunca calculando el total ni inventando datos comerciales.
 
 **n8n no puede `require()` el código del repo desde un Code node.** El Code node de n8n corre en
 un sandbox: solo puede importar paquetes npm instalados dentro de la carpeta de n8n y habilitados
@@ -71,8 +71,34 @@ Para trabajar siempre con el catálogo histórico:
 ECOMMERCE_PROVIDER=local
 ```
 
-`ANTHROPIC_API_KEY` sigue siendo opcional. Sin ella, el sistema usa `StubIntentParser` y
+Para usar la integración demostrativa de solo lectura con las páginas públicas de Lenaldi:
+
+```bash
+ECOMMERCE_PROVIDER=lenaldi
+LENALDI_CACHE_TTL_SECONDS=900
+LENALDI_WHATSAPP_NUMBER=
+```
+
+Este proveedor consulta una vez por ciclo de caché las páginas públicas de Adidas, New Balance,
+Nike, Puma y Vans alojadas en Google Sites. Normaliza únicamente nombre, marca, precio, imagen,
+URL de origen y el enlace público “Hace tu pedido” cuando existe. No interpreta el ID interno como
+SKU y no inventa stock, talles, promociones ni señales de calidad. Si Google Sites rechaza o demora
+la consulta, el adaptador usa la última copia disponible en memoria o el fallback local existente.
+La demostración no implica una asociación comercial oficial con Lenaldi.
+
+`GEMINI_API_KEY` sigue siendo opcional. Sin ella, el sistema usa `StubIntentParser` y
 `StubExplainer`, conservando el cálculo determinístico.
+
+## Publicación HTTPS y Google Sites
+
+Después de `npm run build:api`, `npm start --workspace=@sba/api` sirve la API y la landing desde
+el mismo origen. En una plataforma Node con HTTPS solo hay que configurar `PORT`,
+`ECOMMERCE_PROVIDER=lenaldi`, `GEMINI_API_KEY`, `LENALDI_WHATSAPP_NUMBER` y, opcionalmente,
+`LENALDI_CACHE_TTL_SECONDS`. La clave de Gemini debe cargarse como secreto del proveedor de hosting.
+
+La URL raíz publicada puede incorporarse manualmente en Google Sites mediante **Insertar →
+Incorporar → URL**. La aplicación no envía credenciales al navegador y no establece encabezados
+que bloqueen su uso dentro de un iframe de Google Sites.
 
 ## Probar la sustitución
 
@@ -80,6 +106,25 @@ En modo `ECOMMERCE_PROVIDER=local`, el catálogo de prueba tiene a propósito do
 stock con un reemplazo real disponible: "Detergente Ala 750ml" (reemplazado por "Detergente Skip
 900ml") y "Perfume mini 30ml" (reemplazado por otra fragancia). En la web, escribí "detergente" en
 el campo de producto puntual y vas a ver la sustitución explicada.
+
+## Motor de decision y politicas demo
+
+`POST /bundle` acepta `strategy` con uno de estos valores: `lowest-cost`, `balanced`,
+`quality-first` o `maximize-budget`. El motor cubre primero la necesidad principal y sus slots
+complementarios; el precio utilizado queda como desempate, salvo cuando la estrategia elegida lo
+convierte explicitamente en objetivo.
+
+Las senales `qualityScore` y `valueScore` son opcionales. VTEX no las inventa: quedan ausentes si el
+retailer no las publica. Los productos agregados a `catalog.json` para lavar ropa si incluyen esas
+senales y sus nombres indican `Demo`; existen unicamente para demostrar decisiones diferenciadas.
+Lenaldi tampoco publica una señal explícita de calidad; por eso `quality-first` conserva la decisión
+equilibrada e informa que esa estrategia no puede evaluarse con los datos reales del sitio.
+
+La API aplica `Politicas comerciales de demostracion`: beneficio maximo del 5%, minimo tres
+productos, sin acumularlo sobre productos que ya tengan promocion del ecommerce y sin aplicarlo a
+la categoria tecnologia. La respuesta separa subtotal observado, ahorro del ecommerce, beneficio
+Smart Bundle demo, total final y presupuesto restante. Estas reglas no representan politicas reales
+de Carrefour ni informacion de margen.
 
 ## Tests
 

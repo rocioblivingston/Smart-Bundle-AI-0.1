@@ -1,53 +1,78 @@
 import type { Bundle, Product } from '../types.js'
 
-/**
- * Arma el combo que más presupuesto aprovecha sin pasarse ni un peso.
- *
- * Es el problema clásico de la mochila 0/1 con peso = valor = precio:
- * maximizar la suma de precios elegidos sujeto a que no supere `maxBudget`.
- * Programación dinámica exacta y determinística — nada de esto necesita IA,
- * y usar un LLM acá arriesgaría justamente la promesa que no puede fallar:
- * no pasarse del presupuesto.
- *
- * Complejidad O(n · budget). Para un catálogo de prueba y presupuestos en
- * pesos enteros de hasta unas pocas decenas de miles, es instantáneo.
- */
-export function buildBundle(catalog: Product[], maxBudget: number): Bundle {
-  const items = catalog.filter((p) => p.inStock && p.price > 0 && p.price <= maxBudget)
+export interface ProductScore {
+  preference: number
+  complementarity: number
+}
 
-  if (maxBudget <= 0 || items.length === 0) {
+export type ProductScorer = (product: Product) => ProductScore
+
+const NO_SCORE: ProductScorer = () => ({ preference: 0, complementarity: 0 })
+
+/**
+ * Mochila 0/1 deterministica. Las preferencias y la complementariedad son
+ * prioridades blandas; presupuesto, stock y precio son restricciones duras.
+ */
+export function buildBundle(
+  catalog: Product[],
+  maxBudget: number,
+  scoreProduct: ProductScorer = NO_SCORE,
+): Bundle {
+  const capacity = Math.max(0, Math.floor(maxBudget))
+  const items = catalog
+    .filter((product) => product.inStock !== false && product.price > 0 && product.price <= maxBudget)
+    .sort((left, right) => left.id.localeCompare(right.id))
+
+  if (capacity <= 0 || items.length === 0) {
     return { items: [], substitutions: [], totalPrice: 0, leftoverBudget: Math.max(0, maxBudget) }
   }
 
-  // table[i][b] = mejor suma alcanzable usando los primeros i productos con presupuesto b.
-  // Se guarda la tabla completa (no solo la última fila) para poder reconstruir la selección.
-  const table = Array.from({ length: items.length + 1 }, () => new Array<number>(maxBudget + 1).fill(0))
+  const scores = items.map((product) => {
+    const score = scoreProduct(product)
+    return {
+      preference: Math.max(0, Math.trunc(score.preference)),
+      complementarity: Math.max(0, Math.trunc(score.complementarity)),
+    }
+  })
+  const maximumComplementarity = scores.reduce((sum, score) => sum + score.complementarity, 0)
+  const complementarityWeight = capacity + 1
+  const preferenceWeight = (maximumComplementarity + 1) * complementarityWeight
+  const utility = items.map((product, index) =>
+    scores[index].preference * preferenceWeight +
+    scores[index].complementarity * complementarityWeight +
+    Math.ceil(product.price),
+  )
 
-  for (let i = 1; i <= items.length; i++) {
-    // Un ecommerce puede devolver centavos. Redondear hacia arriba para la
-    // capacidad conserva la garantia de no superar el presupuesto.
-    const price = Math.ceil(items[i - 1].price)
-    for (let b = 0; b <= maxBudget; b++) {
-      const without = table[i - 1][b]
-      const withItem = price <= b ? table[i - 1][b - price] + price : -1
-      table[i][b] = Math.max(without, withItem)
+  const table = Array.from(
+    { length: items.length + 1 },
+    () => new Array<number>(capacity + 1).fill(0),
+  )
+
+  for (let index = 1; index <= items.length; index++) {
+    const price = Math.ceil(items[index - 1].price)
+    for (let budget = 0; budget <= capacity; budget++) {
+      const without = table[index - 1][budget]
+      const withItem = price <= budget
+        ? table[index - 1][budget - price] + utility[index - 1]
+        : -1
+      table[index][budget] = Math.max(without, withItem)
     }
   }
 
-  // Reconstrucción: recorre la tabla de atrás hacia adelante.
   const chosen: Product[] = []
-  let b = maxBudget
-  for (let i = items.length; i > 0; i--) {
-    if (table[i][b] !== table[i - 1][b]) {
-      chosen.push(items[i - 1])
-      b -= Math.ceil(items[i - 1].price)
+  let budget = capacity
+  for (let index = items.length; index > 0; index--) {
+    if (table[index][budget] !== table[index - 1][budget]) {
+      chosen.push(items[index - 1])
+      budget -= Math.ceil(items[index - 1].price)
     }
   }
 
-  const actualTotal = Math.round(chosen.reduce((sum, product) => sum + product.price, 0) * 100) / 100
+  const selected = chosen.reverse()
+  const actualTotal = Math.round(selected.reduce((sum, product) => sum + product.price, 0) * 100) / 100
 
   return {
-    items: chosen.reverse(),
+    items: selected,
     substitutions: [],
     totalPrice: actualTotal,
     leftoverBudget: Math.round((maxBudget - actualTotal) * 100) / 100,
