@@ -2,7 +2,7 @@
 // sin depender de que n8n esté corriendo y con el workflow activo.
 // `?api=http://localhost:3101` permite apuntar una vista previa a otra API
 // sin guardar configuracion ni secretos en el frontend.
-const apiBase = new URLSearchParams(window.location.search).get('api') ?? 'https://smart-bundle-ai-0-1.onrender.com/'
+const apiBase = new URLSearchParams(window.location.search).get('api') ?? 'https://smart-bundle-ai-0-1.onrender.com';
 const ENDPOINT = `${apiBase.replace(/\/$/, '')}/bundle`
 const HEALTH_ENDPOINT = `${apiBase.replace(/\/$/, '')}/health`
 
